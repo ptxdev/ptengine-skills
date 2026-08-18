@@ -1,0 +1,28 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # 本仓无运行时依赖，devDependency 只有 husky；ci 需要 lockfile，
+      # 首次没有 lockfile 时用 install 兜底。
+      - run: npm ci || npm install
+      - run: npm run validate
+      # sync 只允许由脚本产出。CI 里再跑一次 sync，若产生任何 diff，
+      # 说明有人绕过 pre-commit 手改了副本或忘了同步。
+      - name: ensure plugin copies are committed
+        run: |
+          npm run sync:plugins
+          if ! git diff --exit-code; then
+            echo "::error::plugins/*/skills/ is out of sync — run 'npm run sync:plugins' and commit"
+            exit 1
+          fi
