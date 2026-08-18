@@ -1,3 +1,15 @@
+set -e
+
+# sync 跑在工作树上，但提交进去的是索引。若 skills/ 有未暂存改动或未跟踪文件，
+# 生成的副本会对应工作树、而提交里的源是索引版本,两者就会不一致——而且校验全绿。
+# 与其猜用户想提交哪一版，不如直接拒绝。
+if ! git diff --quiet -- skills/ || [ -n "$(git ls-files --others --exclude-standard -- skills/)" ]; then
+  echo "pre-commit: skills/ 有未暂存的改动或未跟踪文件。" >&2
+  echo "生成到 plugins/ 的副本会与你实际提交的源不一致。" >&2
+  echo "请先 git add skills/（或 git stash）再提交。" >&2
+  exit 1
+fi
+
 # skills/ 是真值源；plugins/*/skills/ 是生成副本。这里自动重生成并 add，
 # 保证提交里副本永远与源一致——人不需要记得跑 sync。
 npm run sync:plugins

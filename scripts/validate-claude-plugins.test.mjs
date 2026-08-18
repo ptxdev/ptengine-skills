@@ -51,7 +51,7 @@ test('metadata.version differing from plugin entry version is an error', () => {
 
 test('source pointing at a missing plugin.json is an error', () => {
   const root = makeRepo({ marketplace: MARKET, plugins: { ptengine: null } });
-  assert.match(validateClaudePlugins(root).join('\n'), /missing plugin\.json/);
+  assert.match(validateClaudePlugins(root).join('\n'), /is missing \.claude-plugin\/plugin\.json/);
   rmSync(root, { recursive: true, force: true });
 });
 

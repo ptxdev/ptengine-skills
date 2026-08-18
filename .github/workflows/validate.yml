@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -27,3 +30,12 @@ jobs:
             echo "::error::plugins/*/skills/ is out of sync — run 'npm run sync:plugins' and commit"
             exit 1
           fi
+      # 仓库是 public：拦住把内部主机名 / 内部仓库路径 / 明显的密钥形状误提交进来的 PR。
+      - name: scan for internal references and secrets
+        run: |
+          if grep -rniE 'ptmind\.com|ptengine-x|jumpserver|BEGIN [A-Z ]*PRIVATE KEY|(secret|token|password|api[_-]?key)[[:space:]]*[:=]' \
+               skills/ plugins/ README.md AGENTS.md CONTRIBUTING.md; then
+            echo "::error::internal reference or possible secret found — this repo is public, remove it"
+            exit 1
+          fi
+          echo "no internal references or obvious secrets found"

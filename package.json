@@ -6,7 +6,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test \"scripts/**/*.test.mjs\"",
+    "test": "node --test scripts/*.test.mjs",
     "sync:plugins": "node scripts/sync-plugin-skills.mjs",
     "validate": "npm run test && npm run validate:skill-structure && npm run validate:claude-plugins && npm run validate:plugin-skills",
     "validate:skill-structure": "node scripts/validate-skill-structure.mjs",

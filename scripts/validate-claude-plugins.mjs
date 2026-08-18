@@ -45,7 +45,7 @@ export function validateClaudePlugins(rootDir) {
     const pluginDir = resolve(rootDir, entry.source);
     const manifestPath = join(pluginDir, '.claude-plugin', 'plugin.json');
     if (!existsSync(manifestPath)) {
-      errors.push(`${label}: source '${entry.source}' has missing plugin.json`);
+      errors.push(`${label}: source '${entry.source}' is missing .claude-plugin/plugin.json`);
       continue;
     }
     let manifest;
