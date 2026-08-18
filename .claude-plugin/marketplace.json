@@ -1,0 +1,20 @@
+{
+  "name": "ptengine",
+  "owner": {
+    "name": "Ptengine"
+  },
+  "metadata": {
+    "description": "Official Ptengine Agent Skills for Claude Code",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "ptengine",
+      "source": "./plugins/ptengine",
+      "description": "Ptengine analytics expertise for your agent — how to query visits, events, funnels, user paths, experiments, landing pages, and individual users through the Ptengine MCP server, and how to read the results.",
+      "version": "1.0.0",
+      "category": "database",
+      "tags": ["ptengine", "analytics", "web-analytics", "mcp", "funnel", "ab-test"]
+    }
+  ]
+}

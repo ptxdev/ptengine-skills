@@ -1,0 +1,11 @@
+{
+  "name": "ptengine",
+  "description": "Ptengine analytics expertise for your agent — how to query visits, events, funnels, user paths, experiments, landing pages, and individual users through the Ptengine MCP server, and how to read the results.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Ptengine"
+  },
+  "homepage": "https://helps.ptengine.com/en/ai/mcp",
+  "keywords": ["ptengine", "analytics", "web-analytics", "mcp", "data-query", "funnel", "ab-test"],
+  "category": "database"
+}
