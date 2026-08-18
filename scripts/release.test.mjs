@@ -62,3 +62,29 @@ test('bump keeps trailing newline and 2-space indent', () => {
   assert.match(raw, /\n {2}"name"/);
   rmSync(root, { recursive: true, force: true });
 });
+
+test('bump refuses when a plugin entry has no source, and writes nothing', () => {
+  const root = makeRepo();
+  const marketPath = join(root, '.claude-plugin', 'marketplace.json');
+  const before = readFileSync(marketPath, 'utf8');
+  const market = JSON.parse(before);
+  market.plugins.push({ name: 'orphan', description: 'd', version: '1.0.0' });
+  writeFileSync(marketPath, JSON.stringify(market, null, 2) + '\n');
+  const after = readFileSync(marketPath, 'utf8');
+
+  assert.throws(() => bumpVersion(root, '1.1.0'), /has no `source`/);
+  assert.equal(readFileSync(marketPath, 'utf8'), after);
+  assert.equal(read(root, 'plugins', 'ptengine', '.claude-plugin', 'plugin.json').version, '1.0.0');
+  rmSync(root, { recursive: true, force: true });
+});
+
+test('bump refuses when a source has no plugin.json, and writes nothing', () => {
+  const root = makeRepo();
+  rmSync(join(root, 'plugins', 'ptengine', '.claude-plugin', 'plugin.json'));
+  const marketPath = join(root, '.claude-plugin', 'marketplace.json');
+  const before = readFileSync(marketPath, 'utf8');
+
+  assert.throws(() => bumpVersion(root, '1.1.0'), /has no \.claude-plugin\/plugin\.json/);
+  assert.equal(readFileSync(marketPath, 'utf8'), before);
+  rmSync(root, { recursive: true, force: true });
+});

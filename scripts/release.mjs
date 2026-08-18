@@ -35,20 +35,34 @@ export function bumpVersion(rootDir, version) {
     throw new Error(`version '${version}' must be greater than current ${current}`);
   }
 
+  // Phase 1 — resolve and validate EVERY plugin manifest before writing anything.
+  // A missing source, a missing plugin.json, or unparseable JSON must fail the whole
+  // release loudly: a half-bumped repo leaves clients stranded on the old version
+  // while the marketplace claims the new one.
+  const targets = [];
+  for (const entry of market.plugins ?? []) {
+    const label = entry.name ?? '?';
+    if (!entry.source) {
+      throw new Error(`marketplace plugin '${label}' has no \`source\` — cannot bump its plugin.json`);
+    }
+    const manifestPath = join(resolve(rootDir, entry.source), '.claude-plugin', 'plugin.json');
+    if (!existsSync(manifestPath)) {
+      throw new Error(`marketplace plugin '${label}': source '${entry.source}' has no .claude-plugin/plugin.json`);
+    }
+    targets.push({ source: entry.source, manifestPath, manifest: readJson(manifestPath) });
+  }
+
+  // Phase 2 — every write below operates on already-validated data.
   const changed = [];
   market.metadata = { ...market.metadata, version };
   for (const entry of market.plugins ?? []) entry.version = version;
   writeJson(marketPath, market);
   changed.push('.claude-plugin/marketplace.json');
 
-  for (const entry of market.plugins ?? []) {
-    if (!entry.source) continue;
-    const manifestPath = join(resolve(rootDir, entry.source), '.claude-plugin', 'plugin.json');
-    if (!existsSync(manifestPath)) continue;
-    const manifest = readJson(manifestPath);
+  for (const { source, manifestPath, manifest } of targets) {
     manifest.version = version;
     writeJson(manifestPath, manifest);
-    changed.push(`${entry.source}/.claude-plugin/plugin.json`);
+    changed.push(`${source}/.claude-plugin/plugin.json`);
   }
   return changed;
 }
