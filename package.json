@@ -1,0 +1,20 @@
+{
+  "name": "ptengine-skills",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test scripts/",
+    "sync:plugins": "node scripts/sync-plugin-skills.mjs",
+    "validate": "npm run test && npm run validate:skill-structure && npm run validate:claude-plugins && npm run validate:plugin-skills",
+    "validate:skill-structure": "node scripts/validate-skill-structure.mjs",
+    "validate:claude-plugins": "node scripts/validate-claude-plugins.mjs",
+    "validate:plugin-skills": "node scripts/sync-plugin-skills.mjs --check",
+    "release": "node scripts/release.mjs"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}
