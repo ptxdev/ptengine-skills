@@ -1,0 +1,6 @@
+# skills/ 是真值源；plugins/*/skills/ 是生成副本。这里自动重生成并 add，
+# 保证提交里副本永远与源一致——人不需要记得跑 sync。
+npm run sync:plugins
+git add plugins
+
+npm run validate
