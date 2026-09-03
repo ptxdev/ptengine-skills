@@ -132,9 +132,9 @@ Hard rules:
    key list in the schema. Legacy string presets (`'last_7_days'`) — don't write them.
    ⚠️ Porting from MCP: for the **aggregate** queryTypes (page/event/traffic/
    funnel/path/page_transitions) only the time field differs — convert MCP's string
-   preset / `customStart`+`customEnd` to this object form (funnel also: `steps`
-   strings → `[{ event }]`) — the rest moves verbatim. `experience_*` / `user_*`
-   param sets **differ per surface**: build them from `data.describe()`, never by
+   preset / `customStart`+`customEnd` to this object form; the rest (funnel's
+   `[{ event }]` steps included) moves verbatim. `experience_*` / `user_*` param
+   sets **differ per surface**: build them from `data.describe()`, never by
    copying MCP params. (This SDK's `timeRange` enum also has the thisWeek/lastMonth
    calendar presets MCP lacks.)
 3. **Never invent event/property names** — wrong names return 0 rows silently.
@@ -166,7 +166,7 @@ classes (`text-foreground`, `bg-secondary`, …), never hardcoded colors; `class
 | Theme/locale never follows the platform | branched on `context` read once at first render — subscribe `on('context')` |
 | Click navigates the whole platform away / 404 | history routing instead of hash |
 | Query returns 0 rows, no error | event/property name doesn't exist — verify via MCP `List-Catalog` |
-| Query worked in MCP but fails/empties in the app | params drifted while porting — follow rule 2's porting scope (aggregate types near-verbatim; `experience_*`/`user_*` rebuilt from `describe()`) |
+| Query worked in MCP but fails/empties in the app | params drifted while porting — follow rule 2's porting scope (aggregate types verbatim except `timeRange`; `experience_*`/`user_*` rebuilt from `describe()`) |
 | Dev entry works, but the **uploaded** version has no `window.PtApp` | SDK loader injection failed — the bundle entry isn't a normal HTML file with a `<head>` |
 | Components render but look unstyled / wrong colors | one of the four UI wirings broken |
 | Page fine, but dialogs/popovers unstyled | `pt-ui` class on `#root` instead of `<html>` |

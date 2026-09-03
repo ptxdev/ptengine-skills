@@ -21,9 +21,9 @@ Applies to `page_insight` / `traffic_insight` / `event_insight` /
   ⚠️ This is the **MCP surface**. A Custom App's `PtApp.data.query` takes an
   **object** `timeRange` (`{ key:'lastDays', days:7 }`, with a richer enum incl.
   thisWeek/lastMonth). Porting MCP params into app code is near-verbatim **for
-  the aggregate types only** (convert the time field; funnel also converts
-  `steps` strings → `[{event}]` objects); `experience_*` / `user_*` param sets
-  differ per surface — build those from the app's `data.describe()`.
+  the aggregate types only** (convert the time field; the rest — funnel's
+  `[{event}]` steps included — moves verbatim); `experience_*` / `user_*` param
+  sets differ per surface — build those from the app's `data.describe()`.
 - **Dimension vocabulary — write aliases, read canonical**: inputs accept
   aliases (camelCase, raw `session_*`, `pt:visit*`) and normalize them, but the
   **returned dimension column uses the canonical name**. Canonical vocab
@@ -87,9 +87,13 @@ sorted by `event_count` desc, **not by time** — re-sort time dimensions yourse
 
 ### funnel_insight
 Ordered (loose-sequence, user-level, earliest-forward) event funnel.
-**`steps` is an array of event-name strings** (≥2) — the tool's prose still
-mentions per-step filters, but the validated schema takes plain strings; trust
-the schema. `conversionWindow` bounds the TOTAL step1→stepN time (default 7
+**`steps` is an array of OBJECTS** `[{ event, label?, filters? }]` (≥2; `event`
+is the verbatim event name; per-step `filters` are supported) — plain strings
+are **rejected** ("expected object, received string"). ⚠️ `Get-Query-Schema`
+currently renders `steps.items` as `string` — a known describe-layer bug with
+wrapped array elements, and the one place the rendered schema is wrong; trust
+this note and the validator's `acceptedParams` error instead.
+`conversionWindow` bounds the TOTAL step1→stepN time (default 7
 days), not the gap between adjacent steps. Read-out: the `step` column is the
 **string** `"step1"`/`"step2"` — strip the prefix before sorting numerically
 (`Number("step1")` is NaN; lexicographic order puts step10 before step2);

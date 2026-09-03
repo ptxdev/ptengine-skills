@@ -34,7 +34,7 @@ equivalent legacy entrances to `kind=events` / `kind=event_properties`; prefer `
 | — (`List-Profiles`, separate tool) | match the user's site by name/domain (several matches → **ask**) | `profileId` on every other tool |
 | — (`Get-Current-Account`, separate tool) | confirm which account / bound profile this session or API key is using | sanity check before querying |
 | `pages` | resolve "top pages" / a page named without a URL | its page-path field → `pageUrls` |
-| `events` | confirm an event name before an event/funnel/path query | verbatim event name → `event_insight` `events[]` / `funnel_insight` `steps[]` (**plain strings**) / `path_insight` `anchor` / `experiment_attributed_funnel` `steps[].event` |
+| `events` | confirm an event name before an event/funnel/path query | verbatim event name → `event_insight` `events[]` (strings) / `funnel_insight` `steps[].event` (**objects** `{event}`) / `path_insight` `anchor` / `experiment_attributed_funnel` `steps[].event` |
 | `event_properties` | confirm **which event carries a property** (a GMV/amount field often lives on only one event, **varies per profile**) | property name → `aggregations[].property` / `eventProperty.<name>` |
 | `user_properties` | confirm a user-property key (a wrong key silently matches nobody) | key → `dimension:"userProperty.<key>"` / a `userSegments` condition |
 | `experiences` | disambiguate / browse experiments (the `experience_*` queryTypes also accept the **name** directly) | experiment id → `experienceId` |
