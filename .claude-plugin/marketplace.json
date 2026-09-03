@@ -5,16 +5,26 @@
   },
   "metadata": {
     "description": "Official Ptengine Agent Skills for Claude Code",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "plugins": [
     {
       "name": "ptengine",
       "source": "./plugins/ptengine",
-      "description": "Ptengine analytics expertise for your agent — how to query visits, events, funnels, user paths, experiments, landing pages, and individual users through the Ptengine MCP server, and how to read the results.",
-      "version": "1.0.0",
+      "description": "Official Ptengine expertise for your agent — query analytics through the Ptengine MCP server (visits, events, funnels, experiments, users), and build Custom Apps that run inside the Ptengine platform (scaffold, PtApp bridge, data.query, package, publish).",
+      "version": "1.1.0",
       "category": "database",
-      "tags": ["ptengine", "analytics", "web-analytics", "mcp", "funnel", "ab-test"]
+      "tags": [
+        "ptengine",
+        "analytics",
+        "web-analytics",
+        "mcp",
+        "data-query",
+        "funnel",
+        "ab-test",
+        "custom-app",
+        "app-builder"
+      ]
     }
   ]
 }

@@ -26,17 +26,21 @@ normally pass the user's literal words and let the backend resolve them per prof
 
 All discovery/lookup below is ONE tool, `List-Catalog { profileId?, kind, params? }` —
 `kind` picks the catalog; `params` is kind-specific (see the tool's own description).
+(`List-Events` / `List-Event-Properties` may still appear as separate tools — they are
+equivalent legacy entrances to `kind=events` / `kind=event_properties`; prefer `List-Catalog`.)
 
 | `kind` | Use it to… | Chains into |
 |---|---|---|
 | — (`List-Profiles`, separate tool) | match the user's site by name/domain (several matches → **ask**) | `profileId` on every other tool |
+| — (`Get-Current-Account`, separate tool) | confirm which account / bound profile this session or API key is using | sanity check before querying |
 | `pages` | resolve "top pages" / a page named without a URL | its page-path field → `pageUrls` |
-| `events` | confirm an event name before an event/funnel/path query | verbatim event name → `events[]` / `steps[].event` / `anchor` |
+| `events` | confirm an event name before an event/funnel/path query | verbatim event name → `event_insight` `events[]` / `funnel_insight` `steps[]` (**plain strings**) / `path_insight` `anchor` / `experiment_attributed_funnel` `steps[].event` |
 | `event_properties` | confirm **which event carries a property** (a GMV/amount field often lives on only one event, **varies per profile**) | property name → `aggregations[].property` / `eventProperty.<name>` |
 | `user_properties` | confirm a user-property key (a wrong key silently matches nobody) | key → `dimension:"userProperty.<key>"` / a `userSegments` condition |
 | `experiences` | disambiguate / browse experiments (the `experience_*` queryTypes also accept the **name** directly) | experiment id → `experienceId` |
 | `goals` | **required** to get goal ids | `goal_id` → `experiment_attributed_funnel` `steps[]`/`conversions[]`, and `conversions` on `page_insight`/`traffic_insight` |
 | `page_groups` | resolve a `page_group`-type goal's group id → the pages it matches | — |
+| `user_segments` | browse / resolve saved audiences (segments) by name | segment id → `userSegments` on aggregate queryTypes (the `user_segment_search` queryType reads the same catalog and also returns the condition tree) |
 
 ## Two cross-tool patterns
 
