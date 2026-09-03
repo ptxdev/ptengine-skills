@@ -1,18 +1,29 @@
 # Ptengine Agent Skills
 
 Official [Agent Skills](https://agentskills.io/) from **Ptengine** — they teach your
-AI agent how to query Ptengine analytics well and how to read what comes back.
+AI agent how to work with Ptengine: query analytics well (and read what comes
+back), and build **Custom Apps** that run inside the Ptengine platform.
 
-## Prerequisite
+## Skills
 
-These skills help your agent use the **Ptengine MCP server**; connect it first.
-Setup (server URL, OAuth / API-key auth, per-client steps):
-👉 **https://helps.ptengine.com/en/ai/mcp**
+| Skill | What it does |
+| --- | --- |
+| `ptengine-mcp-analytics` | Query Ptengine analytics through the Ptengine MCP server — visits, events, funnels, user paths, experiments, landing pages, and individual users — and parse the results. |
+| `ptengine-custom-app` | Build, debug, package, and publish a Ptengine Custom App — a static bundle that runs inside the platform and talks to it through `window.PtApp` (context, ui, nav, data.query). Covers the silent-failure pitfalls, the MCP↔App-SDK porting rules, and the platform-side publish flow. |
+
+## Prerequisites
+
+- **`ptengine-mcp-analytics`** needs the **Ptengine MCP server** connected first.
+  Setup (server URL, OAuth / API-key auth, per-client steps):
+  👉 **https://helps.ptengine.com/en/ai/mcp**
+- **`ptengine-custom-app`** needs Node 20+ and starts from the official starter
+  ([ptxdev/ptengine-app-starter](https://github.com/ptxdev/ptengine-app-starter)).
+  Connecting the MCP server is strongly recommended too — it is how you validate
+  real event names and query params before writing `data.query` code.
 
 The MCP server gives your agent the *tools*. These skills give it the *expertise*
-to use them — which tool to reach for, how to author a good query, how to resolve
-names and ids first, the one big anti-pattern to avoid, and how to parse the
-result envelope.
+— which tool to reach for, how to author a good query, the anti-patterns to
+avoid, and (for apps) the hard boundaries that fail silently when violated.
 
 ## Install
 
@@ -36,13 +47,8 @@ folder name (it is the skill's id and must match `name:` in `SKILL.md`):
 
 ```bash
 cp -R skills/ptengine-mcp-analytics ~/.claude/skills/
+cp -R skills/ptengine-custom-app ~/.claude/skills/
 ```
-
-## Skills
-
-| Skill | What it does |
-| --- | --- |
-| `ptengine-mcp-analytics` | Query Ptengine analytics through the Ptengine MCP server — visits, events, funnels, user paths, experiments, landing pages, and individual users — and parse the results. |
 
 ## Repository layout
 
