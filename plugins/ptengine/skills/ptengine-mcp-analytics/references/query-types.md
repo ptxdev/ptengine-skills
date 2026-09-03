@@ -143,5 +143,6 @@ per-person detail (may include email) — use only when the question is about a
 specific person. `user_benchmark` runs an LLM-backed pipeline internally (don't
 call it in loops) and its columns are **generated per question** — the one
 exception to reading columns by known names: interpret them via
-`metadata.column_meta` / `sql_description`. None of the `user_*` /
-`experience_*` types accept `userSegments`.
+`metadata.column_meta` / `sql_description`. `userSegments` among these types:
+only `user_list` takes it (to LIST a cohort's members, AND-combined with
+`search`); the other `user_*` and all `experience_*` types do not.

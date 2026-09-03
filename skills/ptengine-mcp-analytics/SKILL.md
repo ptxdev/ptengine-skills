@@ -58,8 +58,9 @@ that one field; everything else moves verbatim.)
 > A **cohort restriction** ("users who did / didn't do X", a saved audience, a
 > membership/rank) is NOT a reason to go free-form — the **aggregate** queryTypes
 > (`page_*` / `traffic_insight` / `event_insight` / `funnel_insight` / `path_insight`
-> / `page_transitions`) accept a `userSegments` cohort param (`user_*` /
-> `experience_*` do NOT). For a saved audience named by the user, resolve it first
+> / `page_transitions`) accept a `userSegments` cohort param, and `user_list` takes
+> it too (to list a cohort's members); the other `user_*` / `experience_*` do NOT.
+> For a saved audience named by the user, resolve it first
 > with `Run-Query queryType=user_segment_search` (returns segment_id + name + the
 > condition tree), then pass `userSegments: { userSegmentId }` — the server expands
 > it against the current definition, so it always matches the product.
