@@ -22,7 +22,8 @@ isn't connected — point the user to the setup guide: https://helps.ptengine.co
 | `List-Query-Types` | List every `queryType` + a one-line summary. |
 | `Get-Query-Schema` | Get one `queryType`'s exact params (JSON Schema) + notes. **Call this before Run-Query when unsure of params.** |
 | `List-Profiles` | List profiles you can access (to resolve/disambiguate `profileId`). |
-| `List-Catalog { kind }` | Discover concrete pages / events / properties / experiments / goals / page-groups for a profile — one tool, `kind` = `pages`\|`events`\|`event_properties`\|`user_properties`\|`experiences`\|`goals`\|`page_groups`. |
+| `List-Catalog { kind }` | Discover concrete pages / events / properties / experiments / goals / page-groups / saved user segments for a profile — one tool, `kind` = `pages`\|`events`\|`event_properties`\|`user_properties`\|`experiences`\|`goals`\|`page_groups`\|`user_segments`. |
+| `Get-Current-Account` | Confirm which account / bound profile the session or API key is using. |
 
 > Deep reference: `Run-Query`'s per-queryType shapes → [`references/query-types.md`](references/query-types.md); every other tool's params / returns / usage → [`references/tools.md`](references/tools.md).
 
@@ -42,26 +43,43 @@ shape; `Get-Query-Schema { queryType }` is the authoritative, always-current sou
 **Mode B — `Run-Data-Query` with a free-form `question` (fallback).**
 For general "[metric] by [one dimension], [filter], Top-N, [time window]" questions,
 trends, or cohorts that no queryType covers. Pass ONE atomic `question`.
+**Check your tool list first**: `Run-Data-Query` is grayscale-gated per account and
+often absent. If it isn't in the list, Mode B does not exist here — route rubric
+#11 to the closest queryType instead (usually `event_insight` / `traffic_insight`
+with a `dimension`), or tell the user free-form querying isn't enabled.
 
-> A **cohort restriction** ("users who did / didn't do X", a membership/rank) is NOT
-> a reason to go free-form — most queryTypes accept a `userSegments` cohort param.
-> Reach for the queryType + `userSegments`, not a free-form question.
+**Time window (all aggregate queryTypes)**: `timeRange` is a **string preset**
+(`last_7|14|30|60|90|180|365_days` | `today` | `yesterday`) or
+`customStart`+`customEnd` (`YYYY-MM-DD`) which overrides it. No calendar presets
+(this week / last month) exist — express those with custom dates. (Porting params
+into a Custom App? Its `PtApp.data.query` takes an **object** `timeRange` — convert
+that one field; everything else moves verbatim.)
+
+> A **cohort restriction** ("users who did / didn't do X", a saved audience, a
+> membership/rank) is NOT a reason to go free-form — the **aggregate** queryTypes
+> (`page_*` / `traffic_insight` / `event_insight` / `funnel_insight` / `path_insight`
+> / `page_transitions`) accept a `userSegments` cohort param (`user_*` /
+> `experience_*` do NOT). For a saved audience named by the user, resolve it first
+> with `Run-Query queryType=user_segment_search` (returns segment_id + name + the
+> condition tree), then pass `userSegments: { userSegmentId }` — the server expands
+> it against the current definition, so it always matches the product.
 
 ## Decision rubric (first match wins → `queryType`)
 
-1. **One named user** (userId / email / device_id)? → `user_overview` / `user_timeline` / `user_session_detail` / `user_benchmark` / `user_journey` (cross-session event journey).
-2. **List / search the experiment catalog** (by name, status, time)? → `experience_search`.
-3. **A specific experiment / A-B test by name or id?**
+1. **One named user** (userId / email / device_id)? → `user_overview` / `user_timeline` / `user_session_detail` / `user_benchmark` / `user_journey` (cross-session event journey); search a user by name/email → `user_list`.
+2. **A saved audience / segment named** ("paying users", "the VIP segment", "我们的活跃用户分群")? → `user_segment_search` to resolve it, then filter the metric query with `userSegments` (see the cohort note above).
+3. **List / search the experiment catalog** (by name, status, time)? → `experience_search`.
+4. **A specific experiment / A-B test by name or id?**
    - A/B winner / uplift / 胜率 (per-version × goal, add `dimension` for by-device/country) → `experience_abtest_report`.
    - Whole-experiment overview / trend (no per-version rows) → `experience_report`.
    - A SET of experiments' attributed impact on an event funnel → `experiment_attributed_funnel`.
-4. **A landing-page URL / page set's performance?** → `page_insight` (page KPIs, optional groupBy + `userSegments`), `page_block_metrics` (per block), `page_element_metrics` (per element).
-5. **Whole-site KPI overview** (visits / users / pageviews / bounce … as a bundle, optional 1 dimension, optional cohort)? → `traffic_insight`.
-6. **Event behaviour** — how often event X fired / how many users / conversion rate / SUM·AVG of an event property, optionally by ONE dimension? → `event_insight`.
-7. **Ordered multi-step funnel** (A→B→C, per-step drop-off, step timing)? → `funnel_insight` (verbatim event steps).
-8. **Anchored path** — "where did users go / what did they do AFTER X" (or how they ARRIVED at X → `direction:'backward'`)? → `path_insight`.
-9. **Unanchored page-to-page flow** — site-wide top page transitions / Sankey edges? → `page_transitions`.
-10. **None of the above** — general "[metric] by [1 dimension], [filter], Top-N, [window]" / trend / cohort with NO named experiment → fall back to ONE `Run-Data-Query` question.
+5. **A landing-page URL / page set's performance?** → `page_insight` (page KPIs, optional groupBy + `userSegments`), `page_block_metrics` (per block), `page_element_metrics` (per element).
+6. **Whole-site KPI overview** (visits / users / pageviews / bounce … as a bundle, optional 1 dimension, optional cohort)? → `traffic_insight`.
+7. **Event behaviour** — how often event X fired / how many users / conversion rate / SUM·AVG of an event property, optionally by ONE dimension? → `event_insight`.
+8. **Ordered multi-step funnel** (A→B→C, per-step drop-off, step timing)? → `funnel_insight` (verbatim event steps).
+9. **Anchored path** — "where did users go / what did they do AFTER X" (or how they ARRIVED at X → `direction:'backward'`)? → `path_insight`.
+10. **Unanchored page-to-page flow** — site-wide top page transitions / Sankey edges? → `page_transitions`.
+11. **None of the above** — general "[metric] by [1 dimension], [filter], Top-N, [window]" / trend / cohort with NO named experiment → fall back to ONE `Run-Data-Query` question.
 
 Always `Get-Query-Schema { queryType }` if you're unsure of a queryType's params.
 
@@ -137,9 +155,20 @@ Both tools return a JSON payload (in the tool result text). Shapes:
 Parsing rules:
 - **`rows` is a 2-D array** (`any[][]`), aligned to `columns` by index. Read column `X`
   as `row[columns.indexOf("X")]` — do NOT assume a fixed position or object keys.
+  (One exception: `user_benchmark` columns are generated per question — interpret
+  them via `metadata.column_meta` / `sql_description`.)
 - **Do NOT sum the dimension rows to get a total** — a group-by result's rows are the
   breakdown, not a total. If you need the total, request it as its own query.
-- Some results carry extra fields (e.g. `sql`, metadata) — ignore them for parsing.
+- **Read `metadata.warnings` on every result** — skipped filters, unmeasured goal
+  columns, truncation, degraded conversion bases all land there. Non-empty
+  warnings must be reflected in your answer.
+- **null ≠ 0**: `null` means "not measurable here" (e.g. bounceRate for a page
+  never used as an entry page; an unmeasured goal column). `0` is a measured
+  zero. Never present null as zero.
+- **Dimension columns come back under the canonical name**, not the alias you
+  sent (aliases are normalized on input) — read the column names from the result
+  or from `Get-Query-Schema`'s `resultColumns`.
+- Other extra fields (e.g. `sql`) — ignore them for parsing.
 
 **Clarification** (mainly `Run-Data-Query`): `status: "clarification"` with a
 `clarification.question` + `clarification.options`. **Forward the options to the user
