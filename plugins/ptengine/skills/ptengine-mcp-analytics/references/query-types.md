@@ -31,9 +31,12 @@ Applies to `page_insight` / `traffic_insight` / `event_insight` /
   `visitType`; the others are snake_case — `source_channel`, `device_type`,
   `day_of_week`): take the exact list from `Get-Query-Schema` and read columns
   by those names, not by the alias you sent.
-- **`dimensionFilter`** exists on traffic / event / funnel / path — **NOT on
-  `page_insight`** (scope pages there via `pageUrls` / a `pageUrl` filter).
-  Don't infer parameters by symmetry across types.
+- **`dimensionFilter`** narrows the **grouped dimension** to a list of values and
+  therefore **requires `dimension`** — it is not a page scope and not a
+  row-level filter. It is available on the aggregate types including
+  `page_insight` (whose page set still comes from `pageUrls` / a `pageUrl`
+  filter) and on `experience_abtest_report`. Verify per type with
+  `Get-Query-Schema`; don't infer parameters by symmetry.
 - **`userSegments`**: `{ userSegmentId }` (saved segment, server-expanded
   against the current definition — preferred) or inline `{ logic, conditions }`.
   Combining several segments = list their `{ userSegmentId }` entries in
@@ -89,10 +92,8 @@ sorted by `event_count` desc, **not by time** — re-sort time dimensions yourse
 Ordered (loose-sequence, user-level, earliest-forward) event funnel.
 **`steps` is an array of OBJECTS** `[{ event, label?, filters? }]` (≥2; `event`
 is the verbatim event name; per-step `filters` are supported) — plain strings
-are **rejected** ("expected object, received string"). ⚠️ `Get-Query-Schema`
-currently renders `steps.items` as `string` — a known describe-layer bug with
-wrapped array elements, and the one place the rendered schema is wrong; trust
-this note and the validator's `acceptedParams` error instead.
+are **rejected** ("expected object, received string"); `Get-Query-Schema` now
+renders `steps.items` as `object` accordingly.
 `conversionWindow` bounds the TOTAL step1→stepN time (default 7
 days), not the gap between adjacent steps. Read-out: the `step` column is the
 **string** `"step1"`/`"step2"` — strip the prefix before sorting numerically
@@ -121,7 +122,7 @@ element-level impression + click (+ optional goal conversion) for a page set.
   `dimension` for by-device/country slices. ⚠️ The default output is **formatted
   display strings** (`"12.3%"`) — pass `valueFormat:'raw'` (numbers + a leading
   `versionId` column) before doing ANY arithmetic, sorting, or charting
-  (`valueFormat` is MCP-surface-only — the App SDK's version has no such param). Goal
+  (`valueFormat` exists on this queryType only — the other types have no such param). Goal
   columns are **dynamically named** `<goalName>-goalUU` / `-goalRate` /
   `-uplift` / `-probabilityToBeBest`; `avgSessionDuration` is milliseconds.
 - `experiment_attributed_funnel`: a SET of experiments' attributed impact on a
