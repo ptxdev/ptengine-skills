@@ -85,8 +85,8 @@ generates the address as `<id, or a slug of the app name>-<8 hex characters>` â€
 
 - Nobody types an identifier anywhere in the product, and there is no "identifier taken"
   error to work around â€” the same bundle can be uploaded by any number of workspaces.
-- The address is fixed at creation and cannot be renamed; it is visible on the app's
-  basic-info tab and in the publish result.
+- The address is fixed at creation and cannot be renamed; for apps with a backend it is
+  visible on the app's basic-info tab, and it appears in the publish result.
 - Never hard-code that address in your app or your docs. Inside the app, use
   `context.appId` from the bridge.
 

@@ -36,7 +36,8 @@ screen over this text.
    example `user-persona-6282c7fb`). It is assigned at creation, globally
    unique, and **cannot be changed afterwards**. A `manifest.json` `id` only
    seeds the readable prefix — it is never used verbatim, so two workspaces
-   uploading the same bundle never collide.
+   uploading the same bundle never collide. Creating the app only makes the
+   record: it has no version yet and cannot be opened.
 2. **Upload the bundle**: choose the zip produced by `npm run package`. The
    platform validates it (root `manifest.json`, entry exists, file-type
    whitelist, `manifest.version` higher than the last upload, and — for
