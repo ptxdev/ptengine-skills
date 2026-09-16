@@ -48,7 +48,7 @@ git clone --branch v3.0.0 --depth 1 https://github.com/ptxdev/ptengine-app-start
 cd my-app && rm -rf .git && npm install && npm run dev
 ```
 
-`npm run dev` runs vite + `wrangler dev` and signs real Ed25519 tokens, so expiry, `aud` mismatch and missing scopes surface locally (light apps: plain `npx vite`, see tracks).
+Use the newest `v3.*` tag. `npm run dev` runs vite + `wrangler dev` and signs real Ed25519 tokens, so expiry, `aud` mismatch and missing scopes surface locally; a light app runs the front end alone (see tracks).
 
 ## Front-end invariants (the starter ships exactly this — preserve its shape)
 
@@ -184,15 +184,15 @@ starter's four wirings intact (Tailwind preset, `content` glob into the package 
   version is ignored). `schemaVersion`: `1` = front end only, `2` = may carry `backend`.
 - `scopes`: `analytics:read`, `profile:read`, `user:read`, `ui:notify` — nothing else
   validates. Data scopes now do real work: they decide whether the backend gets a data
-  gateway binding at all, and they drive the admin consent dialog. Declare the minimum
-  and ask for more in a later version rather than up front.
+  gateway binding at all, and they drive the admin consent dialog. Declare the minimum, and
+  ask for more in a later version.
 - `backend` (entry under `_backend/`, `routes` exactly `["/api/*"]`, resources, migrations,
-  declared credential/config names, outbound allow-list, `compatibilityDate`): see
-  [`references/backend-runtime.md`](references/backend-runtime.md).
-- `display_name` / `icon` (zip-relative path, must exist in the zip): uploading a package
-  now **updates the app's name and icon from the manifest automatically** — a name the
-  creator typed by hand wins, and with no `icon` declared the auto-generated monogram tile
-  stays. Bumping a version therefore re-brands the app; change them deliberately.
+  declared credential/config names, outbound allow-list, `compatibilityDate`): see [`references/backend-runtime.md`](references/backend-runtime.md).
+- `display_name` / `icon` (zip-relative, must exist in the zip): an upload **updates the
+  app's name and icon from the manifest**. A hand-typed name wins only until the next
+  upload — **every later version overwrites the current name (admin-page edits included)
+  with that version's `display_name`**, and `icon` behaves the same; keep the name you want
+  in the manifest. With no `icon` declared, the auto-generated monogram tile stays.
 
 ## Publishing
 

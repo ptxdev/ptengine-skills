@@ -104,11 +104,14 @@ that has not been republished.
 Uploading a version **updates the app record's name and icon from the
 manifest automatically** — `display_name` (collapsed to the current UI language)
 and `icon` (the file inside the zip) are applied to what users see in navigation
-and on the explore page. Two exceptions worth knowing:
+and on the explore page. Two things to know:
 
 - **A name the creator typed by hand at creation time wins** over
-  `display_name`, so a deliberately chosen workspace name is not overwritten by
-  a later upload.
+  `display_name` — but only until the next upload. **Every subsequent version
+  overwrites the current name with that version's `display_name`, including a
+  name someone edited on the management page**, and `icon` works the same way.
+  If a name must stay put, put it in the manifest and keep it there; renaming
+  only in the product UI survives exactly until the next release.
 - **With no `icon` declared**, the app keeps the auto-generated monogram tile
   (or whatever icon was chosen in the product) — an absent declaration never
   blanks the icon.

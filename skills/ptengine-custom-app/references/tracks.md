@@ -11,36 +11,43 @@ The right default. The app renders in the iframe, reads platform data through
 **You do not need to read `backend-runtime.md` or `data-queries.md`'s backend half.**
 Everything you need is `SKILL.md` plus the starter's `AGENTS.md`.
 
-Turning the scaffold into a light app — four edits, all verified against the current
-starter (v3):
+Turning the scaffold into a light app — two edits on **starter v3.0.1 or newer**:
 
 1. **Delete `backend/`.**
-2. **Edit the root `tsconfig.json`** and remove the `{ "path": "./backend" }` project
-   reference. **Required**: `ptx build` runs `tsc -b` over the root project and dies with
-   `TS5083: Cannot read file .../backend/tsconfig.json` if the reference is left behind.
-   This is the one edit people miss.
-3. **Edit `manifest.json`**: drop the whole `backend` section and set
+2. **Edit `manifest.json`**: drop the whole `backend` section and set
    `"schemaVersion": 1`. Keep only the scopes the front end actually uses (a read-only
    dashboard is usually `analytics:read` plus `ui:notify`).
-4. Optional tidy-up: drop `@ptengine/app-backend` from `package.json`. `web/src/api.ts`
-   and `shared/api.ts` can stay (they still type-check, and they cost nothing), but delete
-   both if the app never calls an API of its own — keeping a dead API client is how a
-   "light" app quietly grows a backend later.
 
-What the tooling then does — measured, not assumed:
+Optional tidy-up: drop `@ptengine/app-backend` from `package.json`. `web/src/api.ts` and
+`shared/api.ts` can stay (they still type-check and cost nothing), but delete both if the
+app never calls an API of its own — a dead API client is how a "light" app quietly grows a
+backend later.
 
-| Command | Behaviour without `backend/` |
+From v3.0.1 the tooling branches on whether `manifest.json` has a `backend` section, so a
+light app needs no further changes:
+
+| Command | Behaviour with no `backend` section |
 | --- | --- |
-| `npm run doctor` | **Passes unchanged**, reporting "no backend section (static app)" and skipping the local-config checks. No flag, no edit needed |
-| `npm run build` | Fails until edit 2 is done; afterwards builds the front end and prints that it skipped the backend |
-| `npm run package` | Works; the zip carries the front end and `manifest.json` only |
-| `npm run dev` | **Fails** — it looks for the backend's wrangler config and exits (`ENOENT … backend/wrangler.jsonc`). There is no switch |
-
-So a light app's local loop is the plain vite server: run `npx vite` from `web/`
-(http://localhost:5173). `installDevHost()` still installs the mock host, and pointing the
-platform's local dev entry at that URL still gives you the real host and real data.
+| `npm run doctor` | Passes, reporting "no backend section (static app)" and skipping the local-config checks |
+| `npm run dev` | Starts the front end only (no wrangler, no token signing) |
+| `npm run build` | Type-checks and builds the front end, skipping the backend |
+| `npm run package` | Zips the front end plus `manifest.json` |
 
 Ship when `npm run doctor` is clean and `npm run package` prints its success line.
+
+### Using v3.0.0?
+
+That release still assumes a backend in two places — both **verified by running it**, and
+both fixed from v3.0.1:
+
+- `npm run build` fails with `TS5083: Cannot read file .../backend/tsconfig.json` until you
+  also remove the `{ "path": "./backend" }` project reference from the root
+  `tsconfig.json`. This is the edit people miss; `doctor` and `package` are unaffected and
+  pass as-is.
+- `npm run dev` exits with `ENOENT … backend/wrangler.jsonc` and has no switch. Run the
+  front end directly instead: `npx vite` from `web/` (http://localhost:5173).
+  `installDevHost()` still installs the mock host, and pointing the platform's local dev
+  entry at that URL still gives you the real host and real data.
 
 ## Backend track (`schemaVersion: 2`)
 
@@ -61,8 +68,9 @@ a consent dialog in front of your users.
 Nothing is lost — the front end is untouched — but the cost is real, so do it when a
 requirement forces it, not in anticipation.
 
-1. Restore the `backend/` directory from the starter (same version you scaffolded from),
-   re-add the root `tsconfig.json` project reference, and re-add `@ptengine/app-backend`.
+1. Restore the `backend/` directory from the starter (same version you scaffolded from)
+   and re-add `@ptengine/app-backend` (on v3.0.0, also re-add the `{ "path": "./backend" }`
+   project reference to the root `tsconfig.json`).
 2. Write `shared/api.ts` first: routes, params, body and response types are the contract
    both halves compile against.
 3. Add the `backend` section to `manifest.json` and set `"schemaVersion": 2`. Declare
