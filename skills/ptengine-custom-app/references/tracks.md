@@ -11,7 +11,7 @@ The right default. The app renders in the iframe, reads platform data through
 **You do not need to read `backend-runtime.md` or `data-queries.md`'s backend half.**
 Everything you need is `SKILL.md` plus the starter's `AGENTS.md`.
 
-Turning the scaffold into a light app — two edits on **starter v3.0.1 or newer**:
+Turning the scaffold into a light app — two edits on **starter v3.2.0 or newer**:
 
 1. **Delete `backend/`.**
 2. **Edit `manifest.json`**: drop the whole `backend` section and set
@@ -23,7 +23,7 @@ Optional tidy-up: drop `@ptengine/app-backend` from `package.json`. `web/src/api
 app never calls an API of its own — a dead API client is how a "light" app quietly grows a
 backend later.
 
-From v3.0.1 the tooling branches on whether `manifest.json` has a `backend` section, so a
+From v3.2.0 the tooling branches on whether `manifest.json` has a `backend` section, so a
 light app needs no further changes:
 
 | Command | Behaviour with no `backend` section |
@@ -35,10 +35,10 @@ light app needs no further changes:
 
 Ship when `npm run doctor` is clean and `npm run package` prints its success line.
 
-### Using v3.0.0?
+### Using v3.0.0 – v3.1.x?
 
-That release still assumes a backend in two places — both **verified by running it**, and
-both fixed from v3.0.1:
+Every starter release before v3.2.0 still assumes a backend in two places — both
+**verified by running it**, and both fixed from v3.2.0:
 
 - `npm run build` fails with `TS5083: Cannot read file .../backend/tsconfig.json` until you
   also remove the `{ "path": "./backend" }` project reference from the root
@@ -69,8 +69,8 @@ Nothing is lost — the front end is untouched — but the cost is real, so do i
 requirement forces it, not in anticipation.
 
 1. Restore the `backend/` directory from the starter (same version you scaffolded from)
-   and re-add `@ptengine/app-backend` (on v3.0.0, also re-add the `{ "path": "./backend" }`
-   project reference to the root `tsconfig.json`).
+   and re-add `@ptengine/app-backend` (before v3.2.0, also re-add the
+   `{ "path": "./backend" }` project reference to the root `tsconfig.json`).
 2. Write `shared/api.ts` first: routes, params, body and response types are the contract
    both halves compile against.
 3. Add the `backend` section to `manifest.json` and set `"schemaVersion": 2`. Declare

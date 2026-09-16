@@ -44,7 +44,7 @@ tenant data from. Both tracks, including the 1 → 2 upgrade path and its costs:
    hand the zip to the admin flow ([`references/publish-and-operate.md`](references/publish-and-operate.md)).
 
 ```bash
-git clone --branch v3.0.0 --depth 1 https://github.com/ptxdev/ptengine-app-starter.git my-app
+git clone --branch v3.2.0 --depth 1 https://github.com/ptxdev/ptengine-app-starter.git my-app
 cd my-app && rm -rf .git && npm install && npm run dev
 ```
 
