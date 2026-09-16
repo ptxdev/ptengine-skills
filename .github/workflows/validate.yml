@@ -34,7 +34,7 @@ jobs:
       - name: scan for internal references and secrets
         run: |
           if grep -rniE 'ptmind\.com|ptengine-x|jumpserver|BEGIN [A-Z ]*PRIVATE KEY|(secret|token|password|api[_-]?key)[[:space:]]*[:=]' \
-               skills/ plugins/ README.md AGENTS.md CONTRIBUTING.md; then
+               skills/ plugins/ README.md README.zh-CN.md AGENTS.md CONTRIBUTING.md; then
             echo "::error::internal reference or possible secret found — this repo is public, remove it"
             exit 1
           fi
