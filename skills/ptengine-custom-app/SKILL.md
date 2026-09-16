@@ -15,6 +15,20 @@ you declare as `backend` in `manifest.json` with `schemaVersion: 2` (no backend 
 Most mistakes here **fail silently** (blank page, empty data, 404 on every API, one tenant
 reading another's rows) — follow the rules instead of iterating on symptoms.
 
+## Which kind of app are you building?
+
+| | Front-end only (`schemaVersion: 1`) | With a backend (`schemaVersion: 2`) |
+| --- | --- | --- |
+| Data | Platform data through the bridge, `PtApp.data.query` | `ctx.pt.query` server-side, and/or merged with third-party or your own data |
+| Storage | None, or per-browser `localStorage` | D1 / KV — state shared across users, sessions and devices |
+| Credentials | None (the bundle is publicly fetchable) | Third-party credentials held server-side + a declared outbound host allow-list |
+| Compute | Whatever the browser can do while the user waits | Large result sets, post-processing, background work via `ctx.waitUntil` |
+| Permissions | Display-level scopes only | Needs `user:read` or similar, so consent and its incremental-approval design matter |
+
+When unsure, **build the light app first** — it is faster to ship and impossible to leak
+tenant data from. Both tracks, including the 1 → 2 upgrade path and its costs:
+[`references/tracks.md`](references/tracks.md).
+
 ## The workflow (do these in order)
 
 1. **Scaffold** from the official starter (below) — Node 20+; its v3+ layout is
@@ -22,13 +36,10 @@ reading another's rows) — follow the rules instead of iterating on symptoms.
 2. **Read `AGENTS.md` in the scaffolded project** (explicit action: open and read it) —
    the authoritative build guide; this skill is the operating summary, and generated files
    inside `@ptengine/app-sdk` outrank both.
-3. Decide **front-end-only or with a backend** before writing code: it decides
-   `schemaVersion`, the manifest shape and the whole publish flow. Add a backend for
-   third-party API calls, own persistence, server-held credentials, or data work too big
-   or too sensitive for the browser. Otherwise don't.
+3. Settle the track above before writing code — it decides `schemaVersion`, the manifest
+   shape and the whole publish flow ([`references/tracks.md`](references/tracks.md)).
 4. If the app reads Ptengine data, **set up the Ptengine MCP server first** and validate
-   every query there; before writing UI, **read
-   `node_modules/@ptengine/design-components/llms.txt`** (explicit action).
+   every query there; before writing UI, read `@ptengine/design-components`' `llms.txt`.
 5. Build, keeping the invariants below intact. Then **`npm run doctor`, build, package**, and
    hand the zip to the admin flow ([`references/publish-and-operate.md`](references/publish-and-operate.md)).
 
@@ -37,16 +48,15 @@ git clone --branch v3.0.0 --depth 1 https://github.com/ptxdev/ptengine-app-start
 cd my-app && rm -rf .git && npm install && npm run dev
 ```
 
-`npm run dev` runs vite + `wrangler dev` and signs real Ed25519 tokens: local auth is real
-auth, so expiry, `aud` mismatch and missing scopes all surface locally.
+`npm run dev` runs vite + `wrangler dev` and signs real Ed25519 tokens, so expiry, `aud` mismatch and missing scopes surface locally (light apps: plain `npx vite`, see tracks).
 
 ## Front-end invariants (the starter ships exactly this — preserve its shape)
 
 - `web/src/main.tsx` keeps `if (import.meta.env.DEV) await installDevHost();` before
   rendering, imports `tokens.css`, and uses the starter-local `getPtApp()` / `theme.ts`.
   **The DEV guard is safe in production** (the platform injects a blocking SDK loader into
-  the bundle's `<head>` at upload time); the `await` matters in dev-inside-platform mode,
-  and removing it leaves that mode permanently on "PtApp not detected".
+  the bundle's `<head>`); the `await` matters in dev-inside-platform mode — removing it
+  leaves that mode permanently on "PtApp not detected".
 - **`PtApp` ready ≠ `context` ready**: until the host handshake lands, `context` is an
   **empty object** — treat every field as possibly absent, and never branch on
   `context.sid/locale/theme` read once at first render; subscribe with
@@ -70,16 +80,11 @@ auth, so expiry, `aud` mismatch and missing scopes all surface locally.
 
 ## The bridge: window.PtApp
 
-```ts
-window.PtApp = {
-  version, context: { appId, sid, locale, theme, initialPath },
-  ui:   { toast(message, type?), confirm({ title?, message }), overlay(theme | null) },
-  nav:  { push(path), syncRoute(subPath) },
-  data: { query(req), describe() },
-  auth: { getAppToken() },          // only for apps that have a backend
-  on(event, cb)                     // 'context' | 'route' | 'overlay.click' — no others
-}
-```
+`context { appId, sid, locale, theme, initialPath }` · `ui { toast, confirm, overlay }`
+(`confirm` returns a promise — await it) · `nav { push, syncRoute }` ·
+`data { query, describe }` · `auth { getAppToken }` (backend apps only) ·
+`ai { provideContext }` · `on(event, cb)` for exactly `'context'` / `'route'` /
+`'overlay.click'` — no other events, and no other host globals.
 
 - `context.locale` is `zh-CN` | `en-US` | `ja-JP`; `theme` is light/dark; `initialPath`
   restores deep links. `context.sid` identifies the site — **display/cache-key use only;
@@ -96,9 +101,9 @@ window.PtApp = {
 - **Don't hand-write `fetch('/api/...')`** — use the starter's `web/src/api.ts` `api()`
   helper: it mints/renews the token, retries once on 401, unwraps the error envelope. Front
   end and backend are same-origin: no baseURL, no CORS, no cookie work.
-- **Storage**: `localStorage`/`indexedDB` work, but the sandbox origin is **shared by
-  every custom app** — prefix keys with `context.appId`, never keep credentials or
-  personal data there; durable state belongs in the backend (D1/KV).
+- **Storage**: `localStorage`/`indexedDB` work, but the sandbox origin is **shared by every
+  custom app** — prefix keys with `context.appId`, never keep credentials or personal data
+  there; durable state belongs in the backend (D1/KV).
 
 ## The backend runtime
 
@@ -126,17 +131,15 @@ Objects, `connect()`, `caches.default`, `request.cf`, Queues, and **Cron Trigger
 ## Querying data — set up Ptengine MCP first
 
 Two paths, one contract, one result shape `{ columns, rows, rowCount, metadata }`: the
-**bridge** `PtApp.data.query(req)` (browser, host-mediated) and the **backend**
-`ctx.pt.query(queryType, params)` (needs a data scope in the manifest, else 501
-`PT_GATEWAY_NOT_BOUND`). Both run **as the calling user** in their workspace — code cannot
-widen that. Rules, param porting and envelope details:
+**bridge** `PtApp.data.query(req)` and the **backend** `ctx.pt.query(queryType, params)`
+(needs a data scope, else 501 `PT_GATEWAY_NOT_BOUND`). Both run **as the calling user** in
+their workspace — code cannot widen that. Rules, param porting and envelope details:
 [`references/data-queries.md`](references/data-queries.md). Broken most often: **never
 write params from memory** (`data.describe()`, or the SDK's `data-query.llms.txt`);
 **`timeRange` is an object** (`{ key: 'lastDays', days: 7 }`); **never invent event names**
-(wrong name = 0 rows, no error); **one question = one query** (group with `dimension`).
-Cap is 5000 rows; `user_*` types return single-person detail — prefer aggregates in
-dashboards, and the backend path when person-level rows must stay out of the browser.
-
+(wrong name = 0 rows, no error); **one question = one query** (group with `dimension`);
+5000-row cap; `user_*` returns single-person detail, so prefer aggregates in dashboards
+and the backend path when person-level rows must stay out of the browser.
 **Before writing any query code, recommend the user connect the Ptengine MCP server**
 (setup: https://helps.ptengine.com/en/ai/mcp) and validate the question there first; the
 companion skill `ptengine-mcp-analytics` (same marketplace) teaches querying. Standalone
@@ -158,13 +161,9 @@ starter's four wirings intact (Tailwind preset, `content` glob into the package 
 | "PtApp not detected" forever — only in platform dev mode | the `await` around `installDevHost()` was removed |
 | Front end fine, **every `/api/*` 404s** | `backend` declared but `schemaVersion` still `1`, or the route isn't in `routes` |
 | `getAppToken()` rejects `PT_CONSENT_REQUIRED` / `PT_AUTH_UNSUPPORTED` | scopes not approved yet (retry after the consent dialog) / this app has no published backend (never retry) |
-| Backend 401 `TOKEN_MISSING` / `TOKEN_SIGNATURE_INVALID` / `TOKEN_AUD_MISMATCH` / `TOKEN_EXPIRED` | missing `Authorization` header, hand-written fetch, a token minted for another app — or, locally, `vite` started directly instead of `npm run dev` |
-| 501 `PT_GATEWAY_NOT_BOUND` from `ctx.pt.query`, or 403 `SCOPE_REQUIRED` | the scope isn't in `manifest.scopes`, or that version isn't published and admin-approved yet |
-| 500 `SECRET_NOT_DECLARED` / `VAR_NOT_DECLARED` / `RESOURCE_NOT_DECLARED` | name or resource not declared in the manifest's `backend` section, no value set on the admin page, or missing from `backend/.dev.vars`. A config value changed but not picked up means the opposite: plain config is baked in at publish time, so **republish** (credentials take effect at once) |
-| Outbound call hangs then fails | host not in the manifest's outbound allow-list — empty/omitted list means **no outbound at all** |
+| 501 `PT_GATEWAY_NOT_BOUND`, 403 `SCOPE_REQUIRED`, 401 `TOKEN_*`, 500 `*_NOT_DECLARED`, blocked outbound call, or a 500 carrying only a `requestId` | backend-side causes and fixes: [`references/backend-runtime.md`](references/backend-runtime.md) |
 | A user sees another site's / workspace's rows | a query or KV key missing `ctx.workspaceId` / `ctx.auth.sid` |
-| A 500 with only a `requestId` | unexpected backend error; details are in the platform-side logs only — carry that `requestId` and add `ctx.log` breadcrumbs |
-| Query returns 0 rows, no error | event/property name doesn't exist (verify via MCP `List-Catalog`), or params drifted while porting from MCP |
+| Query returns 0 rows, no error | event/property name doesn't exist (verify via MCP `List-Catalog`), or params drifted when porting |
 | Components unstyled / wrong colors — or page fine but dialogs unstyled | one of the four UI wirings broken; the dialogs-only case is `pt-ui` on `#root` instead of `<html>` |
 | Upload rejected | root manifest / entry name / icon path / file types / `manifest.version` not bumped |
 | Only this machine sees an old version | a local dev entry left on — exit it from the banner |
@@ -172,14 +171,12 @@ starter's four wirings intact (Tailwind preset, `content` glob into the package 
 ## Before you claim it works
 
 1. `npm run doctor` — the conventions above, as an executable check.
-2. `npm run build`, then **`npm run package`**: `build` alone is not enough; only packaging
-   validates zip structure, manifest self-consistency, backend entry and migration
-   numbering. Confirm the packaging success line.
-3. **Behavioral check on the real platform**: have the user point the app's local dev entry
-   at your dev server (see references), open it inside Ptengine, and confirm `context`
-   carries real values, one `data.query` returns non-empty rows, and — with a backend — a
-   real App Token call returns 200. If this cannot be run, say so explicitly ("not yet
-   verified against real data") instead of declaring the app done.
+2. `npm run build`, then **`npm run package`**: only packaging validates zip structure,
+   manifest self-consistency, backend entry and migration numbering. Confirm its success line.
+3. **Behavioral check on the real platform** through the local dev entry: real `context`
+   values, one `data.query` with non-empty rows, and — with a backend — a 200 from a real
+   App Token call. If you cannot run it, say so ("not yet verified against real data")
+   instead of declaring the app done.
 
 ## Manifest
 
@@ -189,10 +186,13 @@ starter's four wirings intact (Tailwind preset, `content` glob into the package 
   validates. Data scopes now do real work: they decide whether the backend gets a data
   gateway binding at all, and they drive the admin consent dialog. Declare the minimum
   and ask for more in a later version rather than up front.
-- `backend` (entry under `_backend/`, `routes` exactly `["/api/*"]`, resources,
-  migrations, declared credential/config names, outbound allow-list, `compatibilityDate`)
-  and `icon` (zip-relative, adopted manually by an admin, never applied automatically):
-  see [`references/backend-runtime.md`](references/backend-runtime.md).
+- `backend` (entry under `_backend/`, `routes` exactly `["/api/*"]`, resources, migrations,
+  declared credential/config names, outbound allow-list, `compatibilityDate`): see
+  [`references/backend-runtime.md`](references/backend-runtime.md).
+- `display_name` / `icon` (zip-relative path, must exist in the zip): uploading a package
+  now **updates the app's name and icon from the manifest automatically** — a name the
+  creator typed by hand wins, and with no `icon` declared the auto-generated monogram tile
+  stays. Bumping a version therefore re-brands the app; change them deliberately.
 
 ## Publishing
 

@@ -99,13 +99,24 @@ Two consequences worth designing for:
 "Changed the value and nothing happened" is almost always a configuration value
 that has not been republished.
 
-## Adopting the bundle's name and icon
+## Name and icon come from the package
 
-If `manifest.json` carries `display_name` / `icon`, they are **not** applied
-automatically. In the app's edit dialog, "fill from app package" copies them
-into the form for preview; they take effect when you press save. The platform
-record (name + icon chosen there) is always the source of truth for what shows
-in navigation.
+Uploading a version **updates the app record's name and icon from the
+manifest automatically** — `display_name` (collapsed to the current UI language)
+and `icon` (the file inside the zip) are applied to what users see in navigation
+and on the explore page. Two exceptions worth knowing:
+
+- **A name the creator typed by hand at creation time wins** over
+  `display_name`, so a deliberately chosen workspace name is not overwritten by
+  a later upload.
+- **With no `icon` declared**, the app keeps the auto-generated monogram tile
+  (or whatever icon was chosen in the product) — an absent declaration never
+  blanks the icon.
+
+The practical consequence: `display_name` and `icon` are part of the release.
+Changing either in the manifest re-brands the app for everyone on the next
+upload, so change them deliberately, and remember that a declared `icon` must
+really exist in the zip (`ICON_NOT_FOUND` otherwise) with an allowed extension.
 
 ## Permissions
 

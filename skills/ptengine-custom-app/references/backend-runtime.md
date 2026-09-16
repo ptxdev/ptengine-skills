@@ -167,6 +167,25 @@ would in production.
   result the front end already fetched through the bridge), then share every downstream
   line of code. Validate anything the browser posted: allow-list columns, cap rows.
 
+## Diagnosis: backend symptom → cause
+
+| Symptom | Cause and fix |
+| --- | --- |
+| 401 `TOKEN_MISSING` / `TOKEN_SIGNATURE_INVALID` / `TOKEN_AUD_MISMATCH` / `TOKEN_EXPIRED` / `TOKEN_CLAIMS_INCOMPLETE` | No `Authorization: Bearer …` header (hand-written `fetch` instead of the `api()` helper), a token minted for another app, or an expired one. Locally it usually means `vite` was started directly rather than `npm run dev`, so nothing signs tokens |
+| 404 on a route you did write | The route key is missing from `routes`, carries an `/api` prefix, or a `:param` route was declared before the static route it shadows |
+| 500 `AUTH_NOT_AVAILABLE` | `ctx.auth` read on a route listed in `publicRoutes` — use `ctx.authOrNull` there, or take the route out of the list |
+| 501 `PT_GATEWAY_NOT_BOUND` | No data scope in `manifest.scopes`, or the version declaring it is not published and admin-approved yet. `ctx.pt.describe()` always returns this |
+| 403 `SCOPE_REQUIRED` | The caller's token lacks the scope `ctx.requireScope()` demands — declare it and have an admin approve the new version |
+| 500 `SECRET_NOT_DECLARED` / `VAR_NOT_DECLARED` | The name is not declared in the manifest, has no value on the admin page, or is missing from `backend/.dev.vars`. `PT_`-prefixed names always fail |
+| Value changed on the admin page but the worker still reads the old one | Config is baked in at publish time — **republish**. Credentials take effect immediately, so this never applies to them |
+| 500 `RESOURCE_NOT_DECLARED` | `backend.resources.database` / `.kv` / `.files` not `true`, or no matching local binding in `wrangler.jsonc` |
+| 403 `RESOURCE_NOT_ALLOWED` at publish time | A customer app declared `resources.files` — object storage is official-apps-only |
+| Outbound call hangs and then fails | The host is not in the manifest's outbound allow-list; an omitted or empty list means no outbound at all. Platform-owned and loopback hosts are always refused |
+| D1 `too many SQL variables` | More than 100 bind parameters in one statement — batch ids at ~90, one statement per batch |
+| A user sees another site's or workspace's rows | A query, KV key or R2 key missing `ctx.workspaceId` and/or `ctx.auth.sid` |
+| Scheduled work never runs | Cron is silently dropped; there is no scheduler |
+| A 500 whose body carries only a `requestId` | An unexpected throw. There is **no log console for app authors** — the stack and your `ctx.log` lines are reachable platform-side by that `requestId` only, so surface it in the UI and log breadcrumbs at every decision point |
+
 ## Not available (don't design around them)
 
 Durable Objects, raw TCP `connect()`, `caches.default`, `request.cf`, mTLS client
