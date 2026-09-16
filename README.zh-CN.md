@@ -14,7 +14,7 @@ AI 智能体的是*工具*，这些 skill 给的是*经验*：该用哪个工具
 | Skill | 做什么 |
 | --- | --- |
 | `ptengine-mcp-analytics` | 通过 Ptengine MCP 服务器查分析数据：访问、事件、漏斗、用户路径、实验、着陆页、单个用户，并正确读懂返回结果。 |
-| `ptengine-custom-app` | 构建、调试、打包、发布 Ptengine 自定义应用：一个跑在平台内、通过 `window.PtApp`（context、ui、nav、data.query、auth）与宿主对话的静态包，可以再带一个自己的后端（服务 `/api/*` 的 Worker，含数据库、KV、服务端取数与平台托管的配置）。涵盖那些不会报错的坑、MCP 与 App SDK 之间的参数移植规则、多租户不变量，以及平台侧的发布流程。 |
+| `ptengine-custom-app` | 构建、调试、打包、发布 Ptengine 自定义应用：一个跑在平台内、通过 `window.PtApp`（context、ui、nav、data.query、auth）与宿主对话的静态包，可以再带一个自己的后端（服务 `/api/*` 的 Worker，含数据库、KV、服务端取数与平台托管的配置）。涵盖那些不会报错的坑、MCP 与 App SDK 之间的参数移植规则、多租户不变量、平台自动分配的应用地址，以及平台侧的发布流程。 |
 
 ## 快速开始
 

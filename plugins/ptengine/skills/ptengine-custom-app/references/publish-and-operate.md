@@ -23,12 +23,20 @@ screen over this text.
   actions (edit, upload version, publish/pause, permissions, local dev, delete).
   For apps with a backend it also carries the **configuration** and
   **credentials** tabs, and the scope/consent state.
+  The app's own address is shown read-only on the **basic info** tab (labelled
+  "Backend address") for apps that have a backend; the full URL appears in the
+  result of a successful publish.
 
 ## First-time flow: from zip to live
 
-1. **Create the app** on the management page: name, description, icon (pick a
-   built-in icon; you can adopt the bundle's own icon later). This creates the
-   app record — it has no version yet and cannot be opened.
+1. **Create the app** on the management page: the dialog asks for just two
+   things — a **name** (required) and the **zip** (optional; you can upload it
+   later). There is no identifier field: the platform assigns the app's address
+   itself, as `<manifest id, or a slug of the name>-<8 hex characters>` (for
+   example `user-persona-6282c7fb`). It is assigned at creation, globally
+   unique, and **cannot be changed afterwards**. A `manifest.json` `id` only
+   seeds the readable prefix — it is never used verbatim, so two workspaces
+   uploading the same bundle never collide.
 2. **Upload the bundle**: choose the zip produced by `npm run package`. The
    platform validates it (root `manifest.json`, entry exists, file-type
    whitelist, `manifest.version` higher than the last upload, and — for

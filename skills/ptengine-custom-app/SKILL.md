@@ -25,9 +25,8 @@ reading another's rows) — follow the rules instead of iterating on symptoms.
 | Compute | Whatever the browser can do while the user waits | Large result sets, post-processing, background work via `ctx.waitUntil` |
 | Permissions | Display-level scopes only | Needs `user:read` or similar, so consent and its incremental-approval design matter |
 
-When unsure, **build the light app first** — it is faster to ship and impossible to leak
-tenant data from. Both tracks, including the 1 → 2 upgrade path and its costs:
-[`references/tracks.md`](references/tracks.md).
+When unsure, **build the light app first** — faster to ship and impossible to leak tenant
+data from. Both tracks and the 1 → 2 upgrade path: [`references/tracks.md`](references/tracks.md).
 
 ## The workflow (do these in order)
 
@@ -78,6 +77,19 @@ Use the newest `v3.*` tag. `npm run dev` runs vite + `wrangler dev` and signs re
 | Every backend read and write keyed by `ctx.workspaceId` **and** `ctx.auth.sid` | Cross-workspace / cross-site data leaks, no error |
 | Host capabilities only via `window.PtApp`; dialogs via `ui.toast/confirm`, never native `alert()`/`confirm()` | Anything else is platform-internal and will change; native dialogs are unreliable in the sandbox |
 
+## The app's address is assigned, not chosen
+
+`manifest.json`'s `id` is **a prefix hint, not the app's identity**. On create, the platform
+generates the address as `<id, or a slug of the app name>-<8 hex characters>` —
+`user-persona` becomes `user-persona-6282c7fb`. Consequences worth stating to the user up front:
+
+- Nobody types an identifier anywhere in the product, and there is no "identifier taken"
+  error to work around — the same bundle can be uploaded by any number of workspaces.
+- The address is fixed at creation and cannot be renamed; it is visible on the app's
+  basic-info tab and in the publish result.
+- Never hard-code that address in your app or your docs. Inside the app, use
+  `context.appId` from the bridge.
+
 ## The bridge: window.PtApp
 
 `context { appId, sid, locale, theme, initialPath }` · `ui { toast, confirm, overlay }`
@@ -113,20 +125,15 @@ Capability table, tenancy rules, local `.dev.vars` setup and proven patterns:
 authenticated unless its exact key is listed in `publicRoutes` (no wildcards, and no
 `ctx.auth` there).
 
-`ctx` in one screen: `ctx.auth` (`userId`/`sid`/`workspaceId`/`scopes`, always verified)
-· `ctx.authOrNull` · `ctx.workspaceId` · `ctx.app` · `ctx.params`/`query`/`body`/`request`
-· `ctx.db` (D1) · `ctx.kv` · `ctx.files` (R2 — **not available to customer apps**)
-· `ctx.pt.query(queryType, params)` · `ctx.fetch(url, {timeoutMs})` (outbound, allow-listed)
-· `ctx.secrets.X` / `ctx.vars.X` (declared names only) · `ctx.requireScope(...)`
-· `ctx.error(status, code)` · `ctx.log(msg, fields)` · `ctx.waitUntil(p)`. Errors come back
-as `{ error: { code, message, requestId } }`.
-
-Non-negotiables: **never touch `env` directly, use `ctx`**; never fork
-`@ptengine/app-backend`; partition every read and write by `ctx.workspaceId` *and*
-`ctx.auth.sid`; keep API changes backward-compatible for one release ("new backend + old
-front end" is live for seconds during every publish). Not available at all: Durable
-Objects, `connect()`, `caches.default`, `request.cf`, Queues, and **Cron Triggers**
-(silently dropped — there is no scheduling yet).
+`ctx` in one screen: `auth` (verified `userId`/`sid`/`workspaceId`/`scopes`) · `authOrNull`
+· `workspaceId` · `app` · `params`/`query`/`body`/`request` · `db` (D1) · `kv` · `files`
+(R2 — **not for customer apps**) · `pt.query` · `fetch` (allow-listed) · `secrets`/`vars`
+(declared names only) · `requireScope` · `error` · `log` · `waitUntil`; errors come back as
+`{ error: { code, message, requestId } }`. Non-negotiables: **never touch `env` directly,
+use `ctx`**; never fork `@ptengine/app-backend`; partition every read and write by
+`ctx.workspaceId` *and* `ctx.auth.sid`; keep API changes backward-compatible for one release
+("new backend + old front end" is live for seconds during every publish). Not available:
+Durable Objects, `connect()`, `caches.default`, `request.cf`, Queues, and **Cron Triggers**.
 
 ## Querying data — set up Ptengine MCP first
 
@@ -138,12 +145,11 @@ their workspace — code cannot widen that. Rules, param porting and envelope de
 write params from memory** (`data.describe()`, or the SDK's `data-query.llms.txt`);
 **`timeRange` is an object** (`{ key: 'lastDays', days: 7 }`); **never invent event names**
 (wrong name = 0 rows, no error); **one question = one query** (group with `dimension`);
-5000-row cap; `user_*` returns single-person detail, so prefer aggregates in dashboards
-and the backend path when person-level rows must stay out of the browser.
+5000-row cap; `user_*` is single-person detail — prefer aggregates, and the backend path
+when person-level rows must stay out of the browser.
 **Before writing any query code, recommend the user connect the Ptengine MCP server**
-(setup: https://helps.ptengine.com/en/ai/mcp) and validate the question there first; the
-companion skill `ptengine-mcp-analytics` (same marketplace) teaches querying. Standalone
-dev returns placeholder data — never proof.
+(setup: https://helps.ptengine.com/en/ai/mcp) and validate the question there first — the
+companion skill `ptengine-mcp-analytics` teaches it. Standalone dev returns placeholder data.
 
 ## UI
 
@@ -156,13 +162,10 @@ starter's four wirings intact (Tailwind preset, `content` glob into the package 
 
 | Symptom | Likely cause |
 | --- | --- |
-| Blank page on platform, works locally | `base: './'` changed in `web/vite.config.ts` |
 | Theme/locale never follows the platform, or a click navigates the whole platform away | `context` read once at first render instead of `on('context')`; history routing instead of hash |
 | "PtApp not detected" forever — only in platform dev mode | the `await` around `installDevHost()` was removed |
-| Front end fine, **every `/api/*` 404s** | `backend` declared but `schemaVersion` still `1`, or the route isn't in `routes` |
 | `getAppToken()` rejects `PT_CONSENT_REQUIRED` / `PT_AUTH_UNSUPPORTED` | scopes not approved yet (retry after the consent dialog) / this app has no published backend (never retry) |
 | 501 `PT_GATEWAY_NOT_BOUND`, 403 `SCOPE_REQUIRED`, 401 `TOKEN_*`, 500 `*_NOT_DECLARED`, blocked outbound call, or a 500 carrying only a `requestId` | backend-side causes and fixes: [`references/backend-runtime.md`](references/backend-runtime.md) |
-| A user sees another site's / workspace's rows | a query or KV key missing `ctx.workspaceId` / `ctx.auth.sid` |
 | Query returns 0 rows, no error | event/property name doesn't exist (verify via MCP `List-Catalog`), or params drifted when porting |
 | Components unstyled / wrong colors — or page fine but dialogs unstyled | one of the four UI wirings broken; the dialogs-only case is `pt-ui` on `#root` instead of `<html>` |
 | Upload rejected | root manifest / entry name / icon path / file types / `manifest.version` not bumped |
@@ -174,9 +177,8 @@ starter's four wirings intact (Tailwind preset, `content` glob into the package 
 2. `npm run build`, then **`npm run package`**: only packaging validates zip structure,
    manifest self-consistency, backend entry and migration numbering. Confirm its success line.
 3. **Behavioral check on the real platform** through the local dev entry: real `context`
-   values, one `data.query` with non-empty rows, and — with a backend — a 200 from a real
-   App Token call. If you cannot run it, say so ("not yet verified against real data")
-   instead of declaring the app done.
+   values, one `data.query` with non-empty rows, and — with a backend — a 200 from a real App
+   Token call. If you cannot run it, say so ("not yet verified against real data").
 
 ## Manifest
 
@@ -188,16 +190,14 @@ starter's four wirings intact (Tailwind preset, `content` glob into the package 
   ask for more in a later version.
 - `backend` (entry under `_backend/`, `routes` exactly `["/api/*"]`, resources, migrations,
   declared credential/config names, outbound allow-list, `compatibilityDate`): see [`references/backend-runtime.md`](references/backend-runtime.md).
-- `display_name` / `icon` (zip-relative, must exist in the zip): an upload **updates the
-  app's name and icon from the manifest**. A hand-typed name wins only until the next
-  upload — **every later version overwrites the current name (admin-page edits included)
-  with that version's `display_name`**, and `icon` behaves the same; keep the name you want
-  in the manifest. With no `icon` declared, the auto-generated monogram tile stays.
+- `display_name` / `icon` (zip-relative, must exist in the zip): **every upload overwrites
+  the app's name and icon from the manifest**, admin-page edits included — keep the name you
+  want there ([`references/publish-and-operate.md`](references/publish-and-operate.md)).
 
 ## Publishing
 
-Create app / upload zip / draft preview / publish / permissions / credential and config
-values / consent / rollback / dev entry / pause / delete are **human admin actions in the
-product UI** (or `ptx deploy` from CI) — guide the user through
-[`references/publish-and-operate.md`](references/publish-and-operate.md); never automate
-those screens with a browser.
+Create app, upload, draft preview, publish, permissions, config/credential values, consent,
+rollback, dev entry, pause, delete are **human admin actions in the product UI** (or `ptx
+deploy` from CI) — guide the user through
+[`references/publish-and-operate.md`](references/publish-and-operate.md), never drive those
+screens with a browser.
