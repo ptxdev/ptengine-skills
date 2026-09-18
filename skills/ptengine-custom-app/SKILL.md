@@ -117,7 +117,8 @@ authenticated unless its exact key is listed in `publicRoutes` (no wildcards, an
 · `ctx.authOrNull` · `ctx.workspaceId` · `ctx.app` · `ctx.params`/`query`/`body`/`request`
 · `ctx.db` (D1) · `ctx.kv` · `ctx.files` (R2 — **not available to customer apps**)
 · `ctx.pt.query(queryType, params)` · `ctx.fetch(url, {timeoutMs})` (outbound, allow-listed)
-· `ctx.secrets.X` / `ctx.vars.X` (declared names only) · `ctx.requireScope(...)`
+· `ctx.secrets.X` / `ctx.vars.X` (declared names only; a changed **vars** value takes effect only after
+  「重新部署」 on the admin config page — no version bump needed; secrets apply immediately) · `ctx.requireScope(...)`
 · `ctx.error(status, code)` · `ctx.log(msg, fields)` · `ctx.waitUntil(p)`. Errors come back
 as `{ error: { code, message, requestId } }`.
 
