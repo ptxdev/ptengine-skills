@@ -133,7 +133,8 @@ authenticated unless its exact key is listed in `publicRoutes` (no wildcards, an
 `ctx` in one screen: `auth` (verified `userId`/`sid`/`workspaceId`/`scopes`) · `authOrNull`
 · `workspaceId` · `app` · `params`/`query`/`body`/`request` · `db` (D1) · `kv` · `files`
 (R2 — **not for customer apps**) · `pt.query` · `fetch` (allow-listed) · `secrets`/`vars`
-(declared names only) · `requireScope` · `error` · `log` · `waitUntil`; errors come back as
+(declared names only; a changed **vars** value takes effect only after 「重新部署」 on the
+admin config page — no version bump needed; secrets apply immediately) · `requireScope` · `error` · `log` · `waitUntil`; errors come back as
 `{ error: { code, message, requestId } }`. Non-negotiables: **never touch `env` directly,
 use `ctx`**; never fork `@ptengine/app-backend`; partition every read and write by
 `ctx.workspaceId` *and* `ctx.auth.sid`; keep API changes backward-compatible for one release
