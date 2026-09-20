@@ -32,8 +32,8 @@ validate:
     - npm run validate
     # sync 只允许由脚本产出。再跑一次 sync，若产生任何 diff，说明有人手改了副本或忘了同步
     - npm run sync:plugins
-    - git add -N .
-    - git diff --exit-code || { echo "plugins/*/skills/ is out of sync — run 'npm run sync:plugins' and commit"; exit 1; }
+    - git add -N plugins/
+    - git diff --exit-code -- plugins/ || { echo "plugins/*/skills/ is out of sync — run 'npm run sync:plugins' and commit"; exit 1; }
     # 镜像到公开仓：拦住内部主机名 / 内部仓库路径 / 明显的密钥形状
     - |
       if grep -rniE 'ptmind\.com|ptengine-x|jumpserver|BEGIN [A-Z ]*PRIVATE KEY|(secret|token|password|api[_-]?key)[[:space:]]*[:=]' \
