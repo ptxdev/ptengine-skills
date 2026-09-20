@@ -91,19 +91,7 @@ so a stale project fails there with the exact `npm i` command to run. `npm run d
 | Backend entry is `export default createApp({...})`, never a hand-rolled `fetch` | Every request unauthenticated, and local testing never shows it |
 | Every backend read and write keyed by `ctx.workspaceId` **and** `ctx.auth.sid` | Cross-workspace / cross-site data leaks, no error |
 | Host capabilities only via `window.PtApp`; dialogs via `ui.toast/confirm`, never native `alert()`/`confirm()` | Anything else is platform-internal and will change; native dialogs are unreliable in the sandbox |
-
-## The app's address is assigned, not chosen
-
-`manifest.json`'s `id` is **a prefix hint, not the app's identity**. On create, the platform
-generates the address as `<id, or a slug of the app name>-<8 hex characters>` —
-`user-persona` becomes `user-persona-6282c7fb`. Consequences worth stating to the user up front:
-
-- Nobody types an identifier anywhere in the product, and there is no "identifier taken"
-  error to work around — the same bundle can be uploaded by any number of workspaces.
-- The address is fixed at creation and cannot be renamed; for apps with a backend it is
-  visible on the app's basic-info tab, and it appears in the publish result.
-- Never hard-code that address in your app or your docs. Inside the app, use
-  `context.appId` from the bridge.
+| The app's address is **assigned, not chosen**: `manifest.id` is only a prefix hint, the platform issues `<id or name slug>-<8 hex>` on create, fixed for life; read it from `context.appId`, never hard-code it | Nobody types an identifier and there is no "taken" error — the same bundle uploads into any number of workspaces ([`publish-and-operate.md`](references/publish-and-operate.md)) |
 
 ## The bridge: window.PtApp
 
@@ -116,11 +104,10 @@ generates the address as `<id, or a slug of the app name>-<8 hex characters>` �
 - `context.locale` is `zh-CN` | `en-US` | `ja-JP`; `theme` is light/dark; `initialPath`
   restores deep links. `context.sid` identifies the site — **display/cache-key use only;
   never put it into query params** (the server binds the profile from the session).
-- `context.user` (SDK ≥2.4.0, optional — older hosts omit it, so null-check) is
-  `{ id, email, name }` of the person using the app; `email` / `name` may be `null`.
-  Display and attribution only. For a trusted identity on the server read the App Token:
-  `ctx.auth.userId` / `ctx.auth.email` / `ctx.auth.name` (`@ptengine/app-backend` ≥0.4.0;
-  `email` / `name` are optional claims — check before use).
+- `context.user` (SDK ≥2.4.0, optional — null-check) is `{ id, email, name }` of the person
+  using the app, for display/attribution only; `email` / `name` may be `null`. A trusted identity
+  lives server-side in the App Token: `ctx.auth.userId` / `.email` / `.name` (app-backend ≥0.4.0,
+  the latter two optional).
 - `nav.push` accepts platform-internal relative paths only; unless you know an exact
   platform target path, **use `syncRoute` and stay inside the app**. `on('context')` →
   re-apply locale/theme (diff before touching DOM); `on('route')` → `{ subPath }`, drive your
@@ -145,16 +132,13 @@ Capability table, tenancy rules, local `.dev.vars` setup and proven patterns:
 authenticated unless its exact key is listed in `publicRoutes` (no wildcards, and no
 `ctx.auth` there).
 
-`ctx` in one screen: `auth` (verified `userId`/`sid`/`workspaceId`/`scopes`) · `authOrNull`
-· `workspaceId` · `app` · `params`/`query`/`body`/`request` · `db` (D1) · `kv` · `files`
-(R2 — **not for customer apps**) · `pt.query` · `fetch` (allow-listed) · `secrets`/`vars`
-(declared names only; a changed **vars** value takes effect only after 「重新部署」 on the
-admin config page — no version bump needed; secrets apply immediately) · `requireScope` · `error` · `log` · `waitUntil`; errors come back as
-`{ error: { code, message, requestId } }`. Non-negotiables: **never touch `env` directly,
-use `ctx`**; never fork `@ptengine/app-backend`; partition every read and write by
-`ctx.workspaceId` *and* `ctx.auth.sid`; keep API changes backward-compatible for one release
-("new backend + old front end" is live for seconds during every publish). Not available:
-Durable Objects, `connect()`, `caches.default`, `request.cf`, Queues, and **Cron Triggers**.
+`ctx` is the whole surface (`auth` · `workspaceId` · `db` · `kv` · `pt.query` · `fetch` ·
+`secrets`/`vars` · `requireScope` · `error` · `log` …) — the field-by-field table, what is
+**not** available (Durable Objects, Queues, Cron Triggers, `connect()`, `request.cf`) and the
+vars-need-「重新部署」 / secrets-apply-at-once rule are in `backend-runtime.md`. Non-negotiables:
+**never touch `env` directly, use `ctx`**; never fork `@ptengine/app-backend`; partition every
+read and write by `ctx.workspaceId` *and* `ctx.auth.sid`; keep API changes backward-compatible
+for one release ("new backend + old front end" is live for seconds during every publish).
 
 ## Querying data — set up Ptengine MCP first
 
@@ -174,10 +158,10 @@ companion skill `ptengine-mcp-analytics` teaches it. Standalone dev returns plac
 
 ## UI
 
-Use `@ptengine/design-components` exclusively (no antd/MUI/chakra, no hand-rolled
-controls); take component/variant names from its `llms.txt`, never from memory. Keep the
-starter's four wirings intact (Tailwind preset, `content` glob into the package `dist`,
-`tokens.css` import, `pt-ui` class on `<html>`). Semantic classes only, never hardcoded colors; `className` is layout-only.
+Use `@ptengine/design-components` exclusively (no antd/MUI/chakra, no hand-rolled controls);
+take component/variant names from its `llms.txt`, never from memory. Keep the starter's four
+wirings intact (Tailwind preset, `content` glob into the package `dist`, `tokens.css` import,
+`pt-ui` class on `<html>`). Semantic classes only, never hardcoded colors; `className` is layout-only.
 
 ## Diagnosis: symptom → likely cause
 
@@ -197,28 +181,23 @@ starter's four wirings intact (Tailwind preset, `content` glob into the package 
 1. `npm run doctor` — the conventions above, as an executable check.
 2. `npm run build`, then **`npm run package`**: only packaging validates zip structure,
    manifest self-consistency, backend entry and migration numbering. Confirm its success line.
-3. **Behavioral check on the real platform** through the local dev entry: real `context`
-   values, one `data.query` with non-empty rows, and — with a backend — a 200 from a real App
-   Token call. If you cannot run it, say so ("not yet verified against real data").
+3. **Behavioral check on the real platform** via the local dev entry: real `context` values, one
+   `data.query` with rows, and — with a backend — a 200 from a real App Token call. If you cannot run it, say so.
 
 ## Manifest
 
 - `version` belongs to the app and **must increase on every upload** (`package.json`
   version is ignored). `schemaVersion`: `1` = front end only, `2` = may carry `backend`.
 - `scopes`: `analytics:read`, `profile:read`, `user:read`, `ui:notify` — nothing else
-  validates. Data scopes now do real work: they decide whether the backend gets a data
-  gateway binding at all, and they drive the admin consent dialog. Declare the minimum, and
-  ask for more in a later version.
+  validates. Data scopes decide whether the backend gets a data gateway at all and drive the
+  admin consent dialog: declare the minimum, ask for more in a later version.
 - `backend` (entry under `_backend/`, `routes` exactly `["/api/*"]`, resources, migrations,
-  declared credential/config names, outbound allow-list, `compatibilityDate`): see [`references/backend-runtime.md`](references/backend-runtime.md).
-- `display_name` / `icon` (zip-relative, must exist in the zip): **every upload overwrites
-  the app's name and icon from the manifest**, admin-page edits included — keep the name you
-  want there ([`references/publish-and-operate.md`](references/publish-and-operate.md)).
+  credential/config names, outbound allow-list, `compatibilityDate`): `backend-runtime.md`.
+- `display_name` / `icon` (zip-relative, must exist): **every upload overwrites the app's
+  name and icon from the manifest**, admin-page edits included (`publish-and-operate.md`).
 
 ## Publishing
 
 Create app, upload, draft preview, publish, permissions, config/credential values, consent,
-rollback, dev entry, pause, delete are **human admin actions in the product UI** (or `ptx
-deploy` from CI) — guide the user through
-[`references/publish-and-operate.md`](references/publish-and-operate.md), never drive those
-screens with a browser.
+rollback, dev entry, pause, delete are **human admin actions in the product UI** (or `ptx deploy`
+from CI) — guide the user through `publish-and-operate.md`, never drive those screens with a browser.
