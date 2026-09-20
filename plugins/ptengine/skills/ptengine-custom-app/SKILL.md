@@ -44,11 +44,26 @@ tenant data from. Both tracks, including the 1 → 2 upgrade path and its costs:
    hand the zip to the admin flow ([`references/publish-and-operate.md`](references/publish-and-operate.md)).
 
 ```bash
-git clone --branch v3.2.0 --depth 1 https://github.com/ptxdev/ptengine-app-starter.git my-app
-cd my-app && rm -rf .git && npm install && npm run dev
+TAG=$(git ls-remote --tags --refs https://github.com/ptxdev/ptengine-app-starter.git 'v3.*' | awk -F/ '{print $NF}' | sort -V | tail -1)
+git clone --branch "$TAG" --depth 1 https://github.com/ptxdev/ptengine-app-starter.git my-app
+cd my-app && rm -rf .git && npm install && npm run doctor && npm run dev
 ```
 
-Use the newest `v3.*` tag. `npm run dev` runs vite + `wrangler dev` and signs real Ed25519 tokens, so expiry, `aud` mismatch and missing scopes surface locally; a light app runs the front end alone (see tracks).
+Always take the newest `v3.*` tag (the command above resolves it; never hard-code one).
+
+**Version check before any work on an existing project** — this doc describes the current
+contract; an older installed package will contradict it (e.g. `requiredScope: "query:read"`
+only exists in app-sdk ≤ 2.2.1). Run `npm ls @ptengine/app-sdk @ptengine/app-backend` and
+upgrade to the newest version satisfying these floors, then `npm install`:
+
+| Package | Floor | Why |
+|---|---|---|
+| `@ptengine/app-sdk` | ≥ 2.4.0 | `context.user`; `requiredScope` values equal the manifest scopes (2.2.2+) |
+| `@ptengine/app-backend` | ≥ 0.4.0 | `ctx.auth.email` / `ctx.auth.name`; `ctx.vars` (0.2+) |
+
+`0.x` caret ranges do not cross minors — `^0.2.0` never reaches 0.4; edit the range, then
+`npm install`. `npm run doctor` enforces the same floors (`PACKAGE_FLOORS` in the starter),
+so a stale project fails there with the exact `npm i` command to run. `npm run dev` runs vite + `wrangler dev` and signs real Ed25519 tokens, so expiry, `aud` mismatch and missing scopes surface locally; a light app runs the front end alone (see tracks).
 
 ## Front-end invariants (the starter ships exactly this — preserve its shape)
 
