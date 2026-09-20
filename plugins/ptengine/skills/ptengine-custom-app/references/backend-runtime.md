@@ -175,8 +175,16 @@ by a **profile API key** (`x-api-key`), created by an Owner/Admin under Experien
 1. Declare the scope and a secret in `manifest.json`: `"scopes": ["openapi:read", …]`, `"backend": { "secrets": ["OPENAPI_KEY"], … }`
    (`PT_` is a reserved prefix — do not name the secret `PT_OPENAPI_KEY`).
 2. After publishing, the workspace admin approves `openapi:read` in the consent dialog and pastes the key on the app's **Credentials** tab.
-3. In a route: `const res = await ctx.fetch(`${ctx.pt.openApiUrl}/datacenter/query`, { method: 'POST',
-   headers: { 'x-api-key': ctx.secrets.OPENAPI_KEY, 'content-type': 'application/json' }, body: JSON.stringify(payload) });`
+3. In a route:
+
+   ```ts
+   const res = await ctx.fetch(`${ctx.pt.openApiUrl}/datacenter/query`, {
+       method: 'POST',
+       headers: { 'x-api-key': ctx.secrets.OPENAPI_KEY, 'content-type': 'application/json' },
+       body: JSON.stringify(payload)
+   });
+   ```
+
    Never hard-code a backend host: `ctx.pt.openApiUrl` is per environment and the outbound worker only allows that host's `/open-api/v1/` prefix.
 
 | Symptom | Cause |
