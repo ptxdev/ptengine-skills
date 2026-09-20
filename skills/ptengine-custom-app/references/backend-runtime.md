@@ -167,6 +167,28 @@ would in production.
   result the front end already fetched through the bridge), then share every downstream
   line of code. Validate anything the browser posted: allow-list columns, cap rows.
 
+## Calling the Ptengine Open API
+
+Open API (`https://<env-backend>/open-api/v1/*`, docs: https://helps.ptengine.com/en/developer/open-api) is authenticated
+by a **profile API key** (`x-api-key`), created by an Owner/Admin under Experience → Settings → External App Integration → API Keys.
+
+1. Declare the scope and a secret in `manifest.json`: `"scopes": ["openapi:read", …]`, `"backend": { "secrets": ["OPENAPI_KEY"], … }`
+   (`PT_` is a reserved prefix — do not name the secret `PT_OPENAPI_KEY`).
+2. After publishing, the workspace admin approves `openapi:read` in the consent dialog and pastes the key on the app's **Credentials** tab.
+3. In a route: `const res = await ctx.fetch(`${ctx.pt.openApiUrl}/datacenter/query`, { method: 'POST',
+   headers: { 'x-api-key': ctx.secrets.OPENAPI_KEY, 'content-type': 'application/json' }, body: JSON.stringify(payload) });`
+   Never hard-code a backend host: `ctx.pt.openApiUrl` is per environment and the outbound worker only allows that host's `/open-api/v1/` prefix.
+
+| Symptom | Cause |
+| --- | --- |
+| 501 `PT_OPENAPI_NOT_DECLARED` when reading `ctx.pt.openApiUrl` | `openapi:read` not in `manifest.scopes` (or not published yet) |
+| 403 `EGRESS_PLATFORM_BLOCKED` on the call | scope not declared / not approved, or you called a path outside `/open-api/v1/` |
+| 401 `{"code":4010}` | the admin has not filled `OPENAPI_KEY` |
+| 429 | the profile's plan rate limit (Free 3 / Trial 10 / Growth 30 requests per minute) |
+
+**Boundary**: the key is stored **per app**, so this only fits apps used by one workspace (self-built or single-customer). A store app installed by many
+workspaces would read the publisher's data with the publisher's key — do not do that; a gateway-based, identity-bound Open API is planned.
+
 ## Diagnosis: backend symptom → cause
 
 | Symptom | Cause and fix |
