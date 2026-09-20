@@ -16,7 +16,7 @@ they are crossed.
 | Skill | What it does |
 | --- | --- |
 | `ptengine-mcp-analytics` | Query Ptengine analytics through the Ptengine MCP server — visits, events, funnels, user paths, experiments, landing pages, and individual users — and parse the results. |
-| `ptengine-custom-app` | Build, debug, package, and publish a Ptengine Custom App: a static bundle that runs inside the platform and talks to it through `window.PtApp` (context, ui, nav, data.query, auth), optionally shipped with its own backend (a Worker serving `/api/*`, with a database, KV, server-side queries and platform-managed configuration). Covers the silent-failure pitfalls, the MCP↔App-SDK porting rules, multi-tenant invariants, and the platform-side publish flow. |
+| `ptengine-custom-app` | Build, debug, package, and publish a Ptengine Custom App: a static bundle that runs inside the platform and talks to it through `window.PtApp` (context, ui, nav, data.query, auth), optionally shipped with its own backend (a Worker serving `/api/*`, with a database, KV, server-side queries and platform-managed configuration). Covers the silent-failure pitfalls, the MCP↔App-SDK porting rules, multi-tenant invariants, the platform-assigned app address, and the platform-side publish flow. |
 
 ## Quick Start
 
