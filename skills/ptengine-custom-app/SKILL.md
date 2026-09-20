@@ -106,7 +106,7 @@ so a stale project fails there with the exact `npm i` command to run. `npm run d
   never put it into query params** (the server binds the profile from the session).
 - `context.user` (SDK ≥2.4.0, optional — null-check) is `{ id, email, name }` of the person
   using the app, for display/attribution only; `email` / `name` may be `null`. A trusted identity
-  lives server-side in the App Token: `ctx.auth.userId` / `.email` / `.name` (app-backend ≥0.4.0,
+  lives server-side in the App Token, as `ctx.auth.userId` / `.email` / `.name` (app-backend ≥0.4.0,
   the latter two optional).
 - `nav.push` accepts platform-internal relative paths only; unless you know an exact
   platform target path, **use `syncRoute` and stay inside the app**. `on('context')` →
