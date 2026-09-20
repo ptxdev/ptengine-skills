@@ -92,7 +92,7 @@ generates the address as `<id, or a slug of the app name>-<8 hex characters>` �
 
 ## The bridge: window.PtApp
 
-`context { appId, sid, locale, theme, initialPath }` · `ui { toast, confirm, overlay }`
+`context { appId, sid, locale, theme, initialPath, user? }` · `ui { toast, confirm, overlay }`
 (`confirm` returns a promise — await it) · `nav { push, syncRoute }` ·
 `data { query, describe }` · `auth { getAppToken }` (backend apps only) ·
 `ai { provideContext }` · `on(event, cb)` for exactly `'context'` / `'route'` /
@@ -101,6 +101,11 @@ generates the address as `<id, or a slug of the app name>-<8 hex characters>` �
 - `context.locale` is `zh-CN` | `en-US` | `ja-JP`; `theme` is light/dark; `initialPath`
   restores deep links. `context.sid` identifies the site — **display/cache-key use only;
   never put it into query params** (the server binds the profile from the session).
+- `context.user` (SDK ≥2.4.0, optional — older hosts omit it, so null-check) is
+  `{ id, email, name }` of the person using the app; `email` / `name` may be `null`.
+  Display and attribution only. For a trusted identity on the server read the App Token:
+  `ctx.auth.userId` / `ctx.auth.email` / `ctx.auth.name` (`@ptengine/app-backend` ≥0.4.0;
+  `email` / `name` are optional claims — check before use).
 - `nav.push` accepts platform-internal relative paths only; unless you know an exact
   platform target path, **use `syncRoute` and stay inside the app**. `on('context')` →
   re-apply locale/theme (diff before touching DOM); `on('route')` → `{ subPath }`, drive your
