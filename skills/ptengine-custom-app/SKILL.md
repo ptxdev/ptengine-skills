@@ -188,9 +188,9 @@ wirings intact (Tailwind preset, `content` glob into the package `dist`, `tokens
 
 - `version` belongs to the app and **must increase on every upload** (`package.json`
   version is ignored). `schemaVersion`: `1` = front end only, `2` = may carry `backend`.
-- `scopes`: `analytics:read`, `profile:read`, `user:read`, `ui:notify` — nothing else
-  validates. Data scopes decide whether the backend gets a data gateway at all and drive the
-  admin consent dialog: declare the minimum, ask for more in a later version.
+- `scopes`: `analytics:read`, `profile:read`, `user:read`, `ui:notify`, `openapi:read` — nothing else validates. Data scopes
+  decide whether the backend gets a data gateway at all and drive the admin consent dialog: declare the minimum, ask for more
+  in a later version. `openapi:read` = call the Open API from the backend with a profile API key (see `backend-runtime.md`); per-app key → single-workspace apps only.
 - `backend` (entry under `_backend/`, `routes` exactly `["/api/*"]`, resources, migrations,
   credential/config names, outbound allow-list, `compatibilityDate`): `backend-runtime.md`.
 - `display_name` / `icon` (zip-relative, must exist): **every upload overwrites the app's
