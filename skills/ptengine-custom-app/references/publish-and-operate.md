@@ -95,6 +95,17 @@ Two consequences worth designing for:
 - Design the backend so a rollback to the previous, narrower version still
   works: put `ctx.requireScope()` only on routes that genuinely read platform
   data, so the rest of the app degrades instead of failing wholesale.
+- **Write scopes (`asset:write`) do not behave like read scopes here.** Read
+  scopes are implicitly granted for apps the workspace built itself, so in
+  practice their dialog never appears and "revoke" has nothing to take away. A
+  write scope has **no such exemption**: it only ever comes from a stored,
+  explicit approval, so even a first-party app shows the dialog once, and a
+  revoke removes the ability to write **immediately** while leaving every read
+  conclusion untouched. That asymmetry is the point — the workspace keeps one
+  revocable handle on anything an app writes into its library.
+- Consequently an app declaring `asset:write` **cannot write before an admin has
+  clicked once**. Make that a first-run state in the UI, not an error path: the
+  403 you get until then is the designed behaviour, not a bug to retry around.
 
 ## Configuration vs credentials, at operating time
 

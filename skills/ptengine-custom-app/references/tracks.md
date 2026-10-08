@@ -8,6 +8,11 @@ how much of it you keep, what you have to read, and what shipping costs later.
 The right default. The app renders in the iframe, reads platform data through
 `PtApp.data.query`, keeps nothing durable of its own, and ships as a static bundle.
 
+⚠️ **Writing to the asset library rules this track out.** `ctx.pt.asset.*` is a backend-only
+surface and `asset:write` is only honoured on a token the backend holds — there is no front-end
+equivalent, by design (the write has to be attributable to an authenticated app, not to whatever
+the browser claims). An app that has to produce assets is a backend app.
+
 **You do not need to read `backend-runtime.md` or `data-queries.md`'s backend half.**
 Everything you need is `SKILL.md` plus the starter's `AGENTS.md`.
 

@@ -50,6 +50,7 @@ What the runtime guarantees, so you must not re-implement it:
 | `ctx.kv` | KV. Needs `backend.resources.kv: true`. Minimum `expirationTtl` is 60s |
 | `ctx.files` | R2, keys auto-prefixed per app. Needs `backend.resources.files: true`, which is **rejected for customer apps** (`RESOURCE_NOT_ALLOWED`) — official apps only, and its prefixing is a runtime convention, not a platform-enforced boundary, so add `${ctx.workspaceId}/` to keys yourself |
 | `ctx.pt.query(queryType, params)` | Server-side Ptengine query — see [`data-queries.md`](data-queries.md). `ctx.pt.describe()` is not open yet (501) |
+| `ctx.pt.asset.*` | Write into the workspace asset library. Needs `asset:write` in `manifest.scopes` **and** an admin's approval. Four calls: `ensureFolder` / `create` / `update` / `uploadSource` — see [Writing to the asset library](#writing-to-the-asset-library-assetwrite) |
 | `ctx.fetch(url, init)` | Outbound with a 10s default `timeoutMs` and structured logging; a caller-supplied `signal` still works. Whether a host is reachable is decided by the manifest's outbound allow-list, not by this call |
 | `ctx.secrets.X` / `ctx.vars.X` | Only names declared in the manifest resolve; anything else throws `SECRET_NOT_DECLARED` / `VAR_NOT_DECLARED` instead of yielding `undefined`. `PT_`-prefixed names are reserved and always refused. An empty string is a legitimate value. Secrets are references — a new value applies at once. Vars are baked into the worker at deploy time — after editing a var on the admin config page click **重新部署** (redeploy current version) to apply it; no new version upload is needed |
 | `ctx.requireScope(...)`, `ctx.error(status, code, detail)`, `ctx.log(msg, fields)`, `ctx.waitUntil(p)` | `detail` goes to logs only, never into the response. `ctx.log` emits one JSON line carrying `requestId` / `appId` / `versionId` / `route` / `userId` / `sid` |
@@ -197,6 +198,115 @@ by a **profile API key** (`x-api-key`), created by an Owner/Admin under Experien
 **Boundary**: the key is stored **per app**, so this only fits apps used by one workspace (self-built or single-customer). A store app installed by many
 workspaces would read the publisher's data with the publisher's key — do not do that; a gateway-based, identity-bound Open API is planned.
 
+## Writing to the asset library (`asset:write`)
+
+`ctx.pt.asset.*` writes into the **workspace's own asset library** — the same library the user
+browses in the product. Four calls, all server-side, all audited.
+
+**Versions**: `ctx.pt.asset` exists from **`@ptengine/app-backend` 0.6.0**; `asset:write` passes
+manifest validation from **`@ptengine/app-sdk` 2.6.0**. On older packages `ctx.pt.asset` is simply
+`undefined` (a `TypeError`, not a friendly error) and the scope is rejected at package time.
+
+**Before anything works**: declare `"asset:write"` in `manifest.scopes`, publish, and have a
+workspace admin approve it in the consent dialog. Unlike read scopes there is **no first-party
+exemption** — an app the workspace built itself still needs that click, and a revoke removes the
+permission immediately. Treat "first call 403s until approved" as the normal first-run path.
+
+```ts
+// 1. The app's own folder under the caller's personal root. Idempotent.
+const { folderId } = await ctx.pt.asset.ensureFolder({ name: 'Weekly reports' });
+
+// 2. A card in it. `content` must be the PtAssetDoc envelope (see below).
+const { assetId } = await ctx.pt.asset.create({
+    folderId,
+    kind: 'note',
+    name: 'Week 42',
+    content: { name: 'Week 42', content: '## Highlights\n\n- …' }
+});
+
+// 3. Rewrite it later. `content` replaces wholesale, it does not merge.
+await ctx.pt.asset.update({ assetId, name: 'Week 42 (revised)', content: { name: 'Week 42 (revised)', content: '…' } });
+
+// 4. Attach a file. `body` may be a string or a ReadableStream — the stream is never read
+//    by the runtime, so large files never land in memory.
+const { sourceId } = await ctx.pt.asset.uploadSource({
+    assetId, filename: 'report.csv', contentType: 'text/csv', body: csvStream
+});
+```
+
+### `content` is an envelope, and getting it wrong fails silently
+
+The server treats `content` as **opaque** — it validates `kind` against a registry and does not
+look at a single byte of the body. So a wrong shape **does not error**: it stores fine, returns
+200, records the audit row, and then the user finds **a card with a title and no body**. Nothing
+in the chain will tell you; only the user will.
+
+The product decides "is this the new envelope?" with
+`typeof content.name === 'string' && typeof content.content === 'string'`. Miss either one and the
+whole document falls back to a legacy reader that renders essentially nothing.
+
+| Field | |
+| --- | --- |
+| `name` | **required** — usually the same string you pass to `create({ name })` |
+| `content` | **required**, body as **Markdown**. Empty string is legal; `undefined` is not |
+| `tagline` / `description` / `tags` / `img` | optional |
+
+`content` is stored verbatim and handed back to the editor verbatim — it is **never** parsed back
+into discrete fields. Want headings, lists or a table? Write them in that Markdown. Do not expect
+the server to split it up by `kind`.
+
+Two kinds are exceptions and do **not** use this envelope (`design_spec`, `proposal` — they keep
+structured content). An app normally should not write those; if you must, confirm the shape with
+the product side first.
+
+### `kind` must be in the registry
+
+`persona`, `brand_info`, `competitor`, `product`, `touchpoint`, `inspiration`, `methodology`,
+`goal`, `design_spec`, `proposal`, `campaign`, `data_insight`, `note`. Anything else is a 400.
+For a generic knowledge entry use `note` — with "a knowledge base is a folder under the Studio
+library", the folder decides what the entry belongs to and `kind` only carries card shape.
+
+### Files: limits live upstream, not in your code
+
+`uploadSource` deliberately validates **neither size nor type** in the runtime. The real limits are
+the product's own, shared with manual uploads in the UI:
+
+- **20 MiB** per file
+- mime allow-list: `image/png`, `image/jpeg`, `image/webp`, `image/gif`, `application/pdf`,
+  `text/plain`, `text/markdown`, `text/csv`,
+  `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (.docx)
+
+Do not re-check these before calling — a second copy of a business rule drifts the moment the
+product changes one. Let the call fail and surface the code.
+
+| Symptom | Cause |
+| --- | --- |
+| 501 `PT_GATEWAY_NOT_BOUND` | `asset:write` not in `manifest.scopes`, or that version is not published yet |
+| 403 `SCOPE_DENIED` | The token carries no `asset:write` — an admin has not approved it, or has revoked it |
+| 403 `ASSET_FORBIDDEN` | The **calling user** cannot write that folder/asset. The token is user-bound: the app never exceeds the person using it |
+| 413 `ASSET_TOO_LARGE` | File over 20 MiB |
+| 415 `ASSET_TYPE_REJECTED` | `contentType` outside the allow-list above |
+| 429 | Per-app write concurrency cap (2 in flight; reads have their own, separate budget of 6) |
+| `PT_ASSET_FAILED` | Anything else — the upstream message is passed through, check the app logs |
+
+### Three things that surprise people
+
+1. **No `seedKey` parameter on `ensureFolder`.** The folder's stable identity is derived
+   server-side from your authenticated `appId`, so an app can neither squat on the product's own
+   folders nor forge another app's. The user may rename or move that folder; the next
+   `ensureFolder` still returns the same id.
+2. **`folderId` is required on `create`.** Omit it and the server falls back to a per-`kind`
+   default location that may sit under a different root — where the user will not find it.
+3. **`update({ content })` replaces, never merges.** Changing only the body still means sending
+   `name` along; otherwise the new document lacks `name` and stops being recognised as the
+   envelope — back to the blank card.
+
+### What the user sees, and when
+
+The app writes server-side. A user who already has the asset library open **will not see the new
+card for up to 5 minutes** — the product caches that list and there is no push channel. This is
+expected; do not "fix" it by writing twice. If the timing matters, tell the user to refresh.
+
 ## Diagnosis: backend symptom → cause
 
 | Symptom | Cause and fix |
@@ -206,6 +316,8 @@ workspaces would read the publisher's data with the publisher's key — do not d
 | 500 `AUTH_NOT_AVAILABLE` | `ctx.auth` read on a route listed in `publicRoutes` — use `ctx.authOrNull` there, or take the route out of the list |
 | 501 `PT_GATEWAY_NOT_BOUND` | No data scope in `manifest.scopes`, or the version declaring it is not published and admin-approved yet. `ctx.pt.describe()` always returns this |
 | 403 `SCOPE_REQUIRED` | The caller's token lacks the scope `ctx.requireScope()` demands — declare it and have an admin approve the new version |
+| 403 `SCOPE_DENIED` on `ctx.pt.asset.*` | Not the same as `SCOPE_REQUIRED`: the token reached the asset endpoint without `asset:write`. Write scopes get **no first-party exemption**, so even your own app needs an admin to approve it once (and a revoke takes it back immediately) |
+| An asset is created but shows up as a card with a title and no body | `content` was not the `PtAssetDoc` envelope — `name` and `content` are both required and both must be strings. Nothing errors on this path; see [Writing to the asset library](#writing-to-the-asset-library-assetwrite) |
 | 500 `SECRET_NOT_DECLARED` / `VAR_NOT_DECLARED` | The name is not declared in the manifest, has no value on the admin page, or is missing from `backend/.dev.vars`. `PT_`-prefixed names always fail |
 | Value changed on the admin page but the worker still reads the old one | Config is baked in at publish time — **republish**. Credentials take effect immediately, so this never applies to them |
 | 500 `RESOURCE_NOT_DECLARED` | `backend.resources.database` / `.kv` / `.files` not `true`, or no matching local binding in `wrangler.jsonc` |
