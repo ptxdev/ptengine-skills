@@ -24,7 +24,7 @@ reading another's rows) — follow the rules instead of iterating on symptoms.
 | Storage | None, or per-browser `localStorage` | D1 / KV — state shared across users, sessions and devices |
 | Credentials | None (the bundle is publicly fetchable) | Third-party credentials held server-side + a declared outbound host allow-list |
 | Compute | Whatever the browser can do while the user waits | Large result sets, post-processing, background work via `ctx.waitUntil` |
-| Permissions | Display-level scopes only | Needs `user:read` or similar, so consent and its incremental-approval design matter |
+| Permissions | Bridge-usable scopes such as `asset:read` / `ui:notify`; never backend-only ones (`openapi:read`, `asset:write`) | Needs `user:read` or similar, so consent and its incremental-approval design matter |
 
 When unsure, **build the light app first** — faster to ship and impossible to leak tenant
 data from. Both tracks and the 1 → 2 upgrade path: [`references/tracks.md`](references/tracks.md).
@@ -143,8 +143,8 @@ directly, use `ctx`**; never fork `@ptengine/app-backend`; partition every read 
 
 Two paths, one contract, one result shape `{ columns, rows, rowCount, metadata }`: the **bridge**
 `PtApp.data.query(req)` and the **backend** `ctx.pt.query(queryType, params)` (needs a data scope,
-else 501 `PT_GATEWAY_NOT_BOUND`); both run **as the calling user** — code cannot widen that. Rules,
-param porting, envelope: [`references/data-queries.md`](references/data-queries.md). Broken most
+else 501 `PT_GATEWAY_NOT_BOUND`); both run **as the calling user** in their workspace — code cannot widen that.
+Rules, param porting, envelope: [`references/data-queries.md`](references/data-queries.md). Broken most
 often: **never write params from memory** (`data.describe()`, or the SDK's `data-query.llms.txt`);
 **`timeRange` is an object** (`{ key: 'lastDays', days: 7 }`); **never invent event names** (wrong
 name = 0 rows, no error); **one question = one query** (group with `dimension`); 5000-row cap;

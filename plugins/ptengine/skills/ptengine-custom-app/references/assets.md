@@ -6,7 +6,7 @@ assets that user can see in Ptengine's Drive — never more.
 | Path | Where | Needs |
 | --- | --- | --- |
 | Bridge | `window.PtApp.asset.list / sharedWithMe / get` (`@ptengine/app-sdk` ≥ 2.7.0) | `asset:read` in `manifest.scopes`; feature-detect with `if (PtApp.asset)` — an older host has no `asset` |
-| Backend | `ctx.pt.asset.list / sharedWithMe / get` (`@ptengine/app-backend` ≥ 0.7.0) | same scope, published and (for external apps) admin-approved — otherwise 501 `PT_GATEWAY_NOT_BOUND` |
+| Backend | `ctx.pt.asset.list / sharedWithMe / get` (`@ptengine/app-backend` ≥ 0.7.0) | same scope in a **published** version. 501 `PT_GATEWAY_NOT_BOUND` only when the manifest declares no data scope at all (or that version is not published yet) — the gateway is bound at deploy time from the manifest, regardless of approval. An external app not yet approved gets 403 `SCOPE_DENIED` (`requiredScope: 'asset:read'`) instead |
 
 `asset:read` is a **read** scope: an app built and uploaded by the workspace itself is implicitly
 authorized; store / external apps need admin consent. (Writing is a different scope with different
@@ -37,7 +37,8 @@ not exist **or** the user cannot see it — the two are deliberately indistingui
 `TOO_MANY_CONCURRENT_QUERIES`, `IAM_UNAVAILABLE` (transient — retry later), `CAPABILITY_UNKNOWN`.
 The list is **not exhaustive**: other upstream codes pass through as-is, so handle unknown codes
 generically. Only an unparseable backend envelope degrades to `PT_ASSET_FAILED`; on the bridge,
-`PT_HOST_UNAVAILABLE` means the app is not running inside Ptengine.
+`PT_HOST_UNAVAILABLE` means the host is unreachable, the handshake failed, or the host returned an
+error frame without a code.
 
 ## Hard rules
 
