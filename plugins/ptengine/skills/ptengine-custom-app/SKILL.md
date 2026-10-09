@@ -20,6 +20,7 @@ reading another's rows) — follow the rules instead of iterating on symptoms.
 | | Front-end only (`schemaVersion: 1`) | With a backend (`schemaVersion: 2`) |
 | --- | --- | --- |
 | Data | Platform data through the bridge, `PtApp.data.query` | `ctx.pt.query` server-side, and/or merged with third-party or your own data |
+| Assets | Browse / read the user's Drive assets, `PtApp.asset.*` | `ctx.pt.asset.list/get/sharedWithMe` server-side — see [`references/assets.md`](references/assets.md) |
 | Storage | None, or per-browser `localStorage` | D1 / KV — state shared across users, sessions and devices |
 | Credentials | None (the bundle is publicly fetchable) | Third-party credentials held server-side + a declared outbound host allow-list |
 | Compute | Whatever the browser can do while the user waits | Large result sets, post-processing, background work via `ctx.waitUntil` |
@@ -66,20 +67,19 @@ so a stale project fails there with the exact `npm i` command to run. `npm run d
 
 ## Front-end invariants (the starter ships exactly this — preserve its shape)
 
-- `web/src/main.tsx` keeps `if (import.meta.env.DEV) await installDevHost();` before
-  rendering, imports `tokens.css`, and uses the starter-local `getPtApp()` / `theme.ts`.
-  **The DEV guard is safe in production** (the platform injects a blocking SDK loader into
-  the bundle's `<head>`); the `await` matters in dev-inside-platform mode — removing it
-  leaves that mode permanently on "PtApp not detected".
-- **`PtApp` ready ≠ `context` ready**: until the host handshake lands, `context` is an
-  **empty object** — treat every field as possibly absent, and never branch on
-  `context.sid/locale/theme` read once at first render; subscribe with
-  `app.on('context', cb)` (what `followPtTheme` does). `ui.*` / `nav.*` calls before the
-  handshake are queued, not lost. `on()` returns **no unsubscribe** — guard stale
-  callbacks with your own flag (see starter `theme.ts`).
+- `web/src/main.tsx` keeps `if (import.meta.env.DEV) await installDevHost();` before rendering,
+  imports `tokens.css`, and uses the starter-local `getPtApp()` / `theme.ts`. **The DEV guard is
+  safe in production** (the platform injects a blocking SDK loader into the bundle's `<head>`); the
+  `await` matters in dev-inside-platform mode — removing it leaves that mode permanently on "PtApp
+  not detected".
+- **`PtApp` ready ≠ `context` ready**: until the host handshake lands, `context` is an **empty
+  object** — treat every field as possibly absent, and never branch on `context.sid/locale/theme`
+  read once at first render; subscribe with `app.on('context', cb)` (what `followPtTheme` does).
+  `ui.*` / `nav.*` calls before the handshake are queued, not lost. `on()` returns **no
+  unsubscribe** — guard stale callbacks with your own flag (see starter `theme.ts`).
 - **Routing**: hash only (`createHashRouter` / `<HashRouter>`) — the entry URL is
-  `.../<versionId>/index.html`, so `history.pushState('/x')` escapes the app. Reflect
-  internal pages with `nav.syncRoute('detail')`; it comes back as `context.initialPath`.
+  `.../<versionId>/index.html`, so `history.pushState('/x')` escapes the app. Reflect internal pages
+  with `nav.syncRoute('detail')`; it comes back as `context.initialPath`.
 
 ## Hard boundaries (violations fail without errors)
 
@@ -128,33 +128,31 @@ so a stale project fails there with the exact `npm i` command to run. `npm run d
 
 Capability table, tenancy rules, local `.dev.vars` setup and proven patterns:
 [`references/backend-runtime.md`](references/backend-runtime.md). The entry is always
-`export default createApp<ApiRoutes>({ routes, publicRoutes })`: every route is
-authenticated unless its exact key is listed in `publicRoutes` (no wildcards, and no
-`ctx.auth` there).
+`export default createApp<ApiRoutes>({ routes, publicRoutes })`: every route is authenticated
+unless its exact key is listed in `publicRoutes` (no wildcards, and no `ctx.auth` there).
 
-`ctx` is the whole surface (`auth` · `workspaceId` · `db` · `kv` · `pt.query` · `fetch` ·
-`secrets`/`vars` · `requireScope` · `error` · `log` …) — the field-by-field table, what is
-**not** available (Durable Objects, Queues, Cron Triggers, `connect()`, `request.cf`) and the
-vars-need-「重新部署」 / secrets-apply-at-once rule are in `backend-runtime.md`. Non-negotiables:
-**never touch `env` directly, use `ctx`**; never fork `@ptengine/app-backend`; partition every
-read and write by `ctx.workspaceId` *and* `ctx.auth.sid`; keep API changes backward-compatible
-for one release ("new backend + old front end" is live for seconds during every publish).
+`ctx` is the whole surface (`auth` · `workspaceId` · `db` · `kv` · `pt.query` / `pt.asset` · `fetch`
+· `secrets`/`vars` · `requireScope` · `error` · `log` …) — the field-by-field table, what is **not**
+available (Durable Objects, Queues, Cron Triggers, `connect()`, `request.cf`) and the vars-need-「重新部署」
+/ secrets-apply-at-once rule are in `backend-runtime.md`. Non-negotiables: **never touch `env`
+directly, use `ctx`**; never fork `@ptengine/app-backend`; partition every read and write by
+`ctx.workspaceId` *and* `ctx.auth.sid`; keep API changes backward-compatible for one release
+("new backend + old front end" is live for seconds during every publish).
 
 ## Querying data — set up Ptengine MCP first
 
-Two paths, one contract, one result shape `{ columns, rows, rowCount, metadata }`: the
-**bridge** `PtApp.data.query(req)` and the **backend** `ctx.pt.query(queryType, params)`
-(needs a data scope, else 501 `PT_GATEWAY_NOT_BOUND`). Both run **as the calling user** in
-their workspace — code cannot widen that. Rules, param porting and envelope details:
-[`references/data-queries.md`](references/data-queries.md). Broken most often: **never
-write params from memory** (`data.describe()`, or the SDK's `data-query.llms.txt`);
-**`timeRange` is an object** (`{ key: 'lastDays', days: 7 }`); **never invent event names**
-(wrong name = 0 rows, no error); **one question = one query** (group with `dimension`);
-5000-row cap; `user_*` is single-person detail — prefer aggregates, and the backend path
-when person-level rows must stay out of the browser.
-**Before writing any query code, recommend the user connect the Ptengine MCP server**
-(setup: https://helps.ptengine.com/en/ai/mcp) and validate the question there first — the
-companion skill `ptengine-mcp-analytics` teaches it. Standalone dev returns placeholder data.
+Two paths, one contract, one result shape `{ columns, rows, rowCount, metadata }`: the **bridge**
+`PtApp.data.query(req)` and the **backend** `ctx.pt.query(queryType, params)` (needs a data scope,
+else 501 `PT_GATEWAY_NOT_BOUND`); both run **as the calling user** — code cannot widen that. Rules,
+param porting, envelope: [`references/data-queries.md`](references/data-queries.md). Broken most
+often: **never write params from memory** (`data.describe()`, or the SDK's `data-query.llms.txt`);
+**`timeRange` is an object** (`{ key: 'lastDays', days: 7 }`); **never invent event names** (wrong
+name = 0 rows, no error); **one question = one query** (group with `dimension`); 5000-row cap;
+`user_*` is single-person detail — prefer aggregates, and the backend path when person-level rows
+must stay out of the browser. **Before writing any query code, recommend the user connect the
+Ptengine MCP server** (setup: https://helps.ptengine.com/en/ai/mcp) and validate the question there
+first — the companion skill `ptengine-mcp-analytics` teaches it. Standalone dev returns placeholder
+data. Reading Drive assets (folders, pages, Studio …) is separate: [`references/assets.md`](references/assets.md).
 
 ## UI
 
@@ -186,11 +184,10 @@ wirings intact (Tailwind preset, `content` glob into the package `dist`, `tokens
 
 ## Manifest
 
-- `version` belongs to the app and **must increase on every upload** (`package.json`
-  version is ignored). `schemaVersion`: `1` = front end only, `2` = may carry `backend`.
-- `scopes`: `analytics:read`, `profile:read`, `user:read`, `ui:notify`, `openapi:read`, `asset:write` — nothing else validates. Data scopes decide whether the backend gets a data gateway at all and drive the admin consent dialog: declare the minimum, ask for more in a later version.
-  `openapi:read` = call the Open API from the backend with a profile API key; per-app key → single-workspace apps only. `asset:write` = write into the workspace asset library from the backend (`ctx.pt.asset.*`), **backend track only**, and the one scope with
-  no first-party exemption — an admin must approve it once before the first write ever succeeds. Both: `backend-runtime.md`; consent semantics: `publish-and-operate.md`.
+- `version` belongs to the app and **must increase on every upload** (`package.json` version is ignored). `schemaVersion`: `1` = front end only, `2` = may carry `backend`.
+- `scopes`: `analytics:read`, `profile:read`, `user:read`, `ui:notify`, `openapi:read`, `asset:read`, `asset:write` — nothing else validates. Data scopes decide whether the backend gets a data gateway at all and drive the admin consent dialog: declare the minimum, ask for more in a later version.
+  `openapi:read` = call the Open API from the backend with a profile API key; per-app key → single-workspace apps only. `asset:read` = read the user's Drive assets, bridge or backend (`references/assets.md`). `asset:write` = write into the workspace asset library from the backend (`ctx.pt.asset.ensureFolder/create/update/uploadSource`), **backend track only**, and the one scope with
+  no first-party exemption — an admin must approve it once before the first write ever succeeds. `openapi:read` / `asset:write`: `backend-runtime.md`; consent semantics: `publish-and-operate.md`.
 - `backend` (entry under `_backend/`, `routes` exactly `["/api/*"]`, resources, migrations,
   credential/config names, outbound allow-list, `compatibilityDate`): `backend-runtime.md`.
 - `display_name` / `icon` (zip-relative, must exist): **every upload overwrites the app's
