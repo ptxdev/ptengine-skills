@@ -113,12 +113,14 @@ Two consequences worth designing for:
   can start spending. The consent dialog's wording says so in all three
   languages; keep your own UI honest about it too.
 - **`ai:invoke` is also gated by the workspace's plan, and that gate is not the
-  consent dialog.** Two different 403s, two different people: `AI_SCOPE_DENIED`
-  means an admin has not clicked approve (fixable in the workspace);
-  `AI_NOT_ENTITLED` means the workspace is not entitled to AI at all (follows
-  the plan — neither you nor the admin can fix it from the app). Design for the
-  second one: AI must not be the only path through the app, or customers without
-  the entitlement simply cannot use what you shipped.
+  consent dialog.** Two different causes, **one indistinguishable error**: an
+  admin not having clicked approve, and the workspace not being entitled at all,
+  both surface as 403 `AI_SCOPE_DENIED` (when a workspace is not entitled the
+  platform never signs the scope into the token, so the gateway cannot tell why).
+  The distinction lives only in platform-side logs. Design for the second case:
+  AI must not be the only path through the app, or customers without the
+  entitlement simply cannot use what you shipped — and do not word the error as
+  "ask your admin", which sends half of them to someone who cannot help.
 - Budget is enforced on the platform side, not in your app. When it runs out the
   backend gets 429 `AI_BUDGET_EXCEEDED` — **a state that needs a human**, not a
   retry. Surface it as "this workspace's AI budget is used up", never as

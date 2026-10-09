@@ -324,11 +324,19 @@ not there.
 | `"ai:invoke"` in `manifest.scopes`, published | you | 501 `PT_GATEWAY_NOT_BOUND` |
 | `@ptengine/app-backend` ≥ 0.7.0 | you | `ctx.pt.ai` is simply not there |
 | A workspace admin approved it **once** | the workspace admin | 403 `AI_SCOPE_DENIED` |
-| **The workspace is entitled to AI** | platform / sales side | 403 `AI_NOT_ENTITLED` |
+| **The workspace is entitled to AI** | platform / sales side | also 403 `AI_SCOPE_DENIED` (see below) |
 
 There is **no first-party exemption** on the third row — an app you uploaded into your own
 workspace still needs that approval, because this scope **spends money**: the platform fronts the
 bill and meters it per workspace.
+
+⚠️ **The last two rows produce the identical error.** When a workspace is not entitled, the
+platform never signs `ai:invoke` into the token at all — the gateway only sees "that scope is not
+here" and cannot tell why. The distinction exists only in platform-side logs.
+
+So **do not word that error as "ask your admin to approve it"**: for a workspace that is not
+entitled, that sends the user to someone who cannot fix it. Say something like "AI is not
+available for this workspace" and give them a way to reach support.
 
 ⚠️ **The fourth row is not yours to move.** `ai:invoke` is a **paid** capability that follows the
 workspace's plan. So **do not make AI the only path through your app**: treat it as an
@@ -376,8 +384,7 @@ app.post('/ask', async ctx => ctx.pt.ai.stream({
 | --- | --- | --- |
 | `PT_GATEWAY_NOT_BOUND` | 501 | Declare `ai:invoke` and publish again |
 | `TOKEN_MISSING` | 401 | This route is in `publicRoutes`, so there is no caller token |
-| `AI_SCOPE_DENIED` | 403 | An admin has not approved it yet |
-| `AI_NOT_ENTITLED` | 403 | **This workspace is not entitled to AI.** Follows the plan — you cannot fix this from the app; degrade instead |
+| `AI_SCOPE_DENIED` | 403 | An admin has not approved it **or** the workspace is not entitled. **You cannot tell which** — see below |
 | `AI_BUDGET_EXCEEDED` | 429 | **The workspace's AI budget is spent.** Raise the limit or wait for the window — **retrying will not help** |
 | `AI_RATE_LIMITED` | 429 | Upstream throttling. This one *is* worth retrying |
 | `AI_UPSTREAM_FAILED` | 502 | Upstream's own failure; the message is passed through verbatim |
