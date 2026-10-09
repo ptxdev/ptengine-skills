@@ -282,9 +282,9 @@ product changes one. Let the call fail and surface the code.
 
 | Symptom | Cause |
 | --- | --- |
-| 501 `PT_GATEWAY_NOT_BOUND` | `asset:write` not in `manifest.scopes`, or that version is not published yet |
+| 501 `PT_GATEWAY_NOT_BOUND` | `manifest.scopes` has neither `asset:write` nor any data scope (`analytics:read` / `profile:read` / `user:read` / `openapi:read` / `asset:read`), or that version is not published yet. Other data scopes declared but `asset:write` missing → 403 `SCOPE_DENIED` |
 | 403 `SCOPE_DENIED` | The token carries no `asset:write` — an admin has not approved it, or has revoked it |
-| 403 `ASSET_FORBIDDEN` | The **calling user** cannot write that folder/asset. The token is user-bound: the app never exceeds the person using it |
+| 403 `FORBIDDEN` | The **calling user** cannot write that folder/asset. The token is user-bound: the app never exceeds the person using it |
 | 413 `ASSET_TOO_LARGE` | File over 20 MiB |
 | 415 `ASSET_TYPE_REJECTED` | `contentType` outside the allow-list above |
 | 429 | Per-app write concurrency cap (2 in flight; reads have their own, separate budget of 6) |

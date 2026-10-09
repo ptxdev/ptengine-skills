@@ -6,7 +6,7 @@ assets that user can see in Ptengine's Drive — never more.
 | Path | Where | Needs |
 | --- | --- | --- |
 | Bridge | `window.PtApp.asset.list / sharedWithMe / get` (`@ptengine/app-sdk` ≥ 2.7.0) | `asset:read` in `manifest.scopes`; feature-detect with `if (PtApp.asset)` — an older host has no `asset` |
-| Backend | `ctx.pt.asset.list / sharedWithMe / get` (`@ptengine/app-backend` ≥ 0.7.0) | same scope in a **published** version. 501 `PT_GATEWAY_NOT_BOUND` only when the manifest declares no data scope at all (or that version is not published yet) — the gateway is bound at deploy time from the manifest, regardless of approval. An external app not yet approved gets 403 `SCOPE_DENIED` (`requiredScope: 'asset:read'`) instead |
+| Backend | `ctx.pt.asset.list / sharedWithMe / get` (`@ptengine/app-backend` ≥ 0.7.0) | same scope in a **published** version. 501 `PT_GATEWAY_NOT_BOUND` only when the manifest declares neither any data scope (`analytics:read` / `profile:read` / `user:read` / `openapi:read` / `asset:read`) nor `asset:write` (or that version is not published yet) — the gateway is bound at deploy time from the manifest, regardless of approval. Other data scopes declared but `asset:read` missing, or an external app not yet approved → 403 `SCOPE_DENIED` (`requiredScope: 'asset:read'`) instead |
 
 `asset:read` is a **read** scope: an app built and uploaded by the workspace itself is implicitly
 authorized; store / external apps need admin consent. (Writing is a different scope with different
@@ -33,12 +33,20 @@ from it) — read it instead of guessing field names.
 
 Codes declared by the schema: `SCOPE_DENIED` (with `requiredScope: 'asset:read'`),
 `ASSET_TYPE_UNSUPPORTED` (e.g. `get` on an `image`), `INVALID_INPUT`, `NOT_FOUND` (the asset does
-not exist **or** the user cannot see it — the two are deliberately indistinguishable),
-`TOO_MANY_CONCURRENT_QUERIES`, `IAM_UNAVAILABLE` (transient — retry later), `CAPABILITY_UNKNOWN`.
-The list is **not exhaustive**: other upstream codes pass through as-is, so handle unknown codes
-generically. Only an unparseable backend envelope degrades to `PT_ASSET_FAILED`; on the bridge,
+not exist, or the permission service returned nothing for it), `TOO_MANY_CONCURRENT_QUERIES`,
+`IAM_UNAVAILABLE` (transient — retry later), `CAPABILITY_UNKNOWN`.
+Also expect 403 `FORBIDDEN`: the asset exists but the calling user's permissions deny it — an
+upstream code passed through verbatim, **not** in the schema's list. The list is **not
+exhaustive**: other upstream codes pass through as-is, so handle unknown codes generically. Only an unparseable backend envelope degrades to `PT_ASSET_FAILED`; on the bridge,
 `PT_HOST_UNAVAILABLE` means the host is unreachable, the handshake failed, or the host returned an
 error frame without a code.
+
+## Walking trees on the bridge
+
+Bridge asset calls share the host's queue with `data.query`: 4 in flight, 50 queued. A route change
+(including `nav.syncRoute`) cancels queued calls with `QUERY_CANCELLED`; a full queue rejects with
+`QUERY_QUEUE_FULL`. When walking recursively keep 2–3 calls in flight — never `Promise.all` a whole
+level.
 
 ## Hard rules
 
