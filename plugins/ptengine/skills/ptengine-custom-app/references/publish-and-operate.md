@@ -112,6 +112,13 @@ Two consequences worth designing for:
   an exemption would mean anyone who can upload an app into their own workspace
   can start spending. The consent dialog's wording says so in all three
   languages; keep your own UI honest about it too.
+- **`ai:invoke` is also gated by the workspace's plan, and that gate is not the
+  consent dialog.** Two different 403s, two different people: `AI_SCOPE_DENIED`
+  means an admin has not clicked approve (fixable in the workspace);
+  `AI_NOT_ENTITLED` means the workspace is not entitled to AI at all (follows
+  the plan — neither you nor the admin can fix it from the app). Design for the
+  second one: AI must not be the only path through the app, or customers without
+  the entitlement simply cannot use what you shipped.
 - Budget is enforced on the platform side, not in your app. When it runs out the
   backend gets 429 `AI_BUDGET_EXCEEDED` — **a state that needs a human**, not a
   retry. Surface it as "this workspace's AI budget is used up", never as

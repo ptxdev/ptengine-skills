@@ -317,10 +317,24 @@ on the platform side** — your app never sees them and cannot send its own.
 manifest validation from **`@ptengine/app-sdk` 2.7.0**. On older packages `ctx.pt.ai` is simply
 not there.
 
-**Before anything works**: declare `"ai:invoke"` in `manifest.scopes`, publish, and have a
-workspace admin approve it once. There is **no first-party exemption** — an app you uploaded into
-your own workspace still needs that approval, because this scope **spends money**: the platform
-fronts the bill and meters it per workspace.
+**Before anything works**, four things must hold **at the same time**:
+
+| | Who moves it | If missing |
+| --- | --- | --- |
+| `"ai:invoke"` in `manifest.scopes`, published | you | 501 `PT_GATEWAY_NOT_BOUND` |
+| `@ptengine/app-backend` ≥ 0.7.0 | you | `ctx.pt.ai` is simply not there |
+| A workspace admin approved it **once** | the workspace admin | 403 `AI_SCOPE_DENIED` |
+| **The workspace is entitled to AI** | platform / sales side | 403 `AI_NOT_ENTITLED` |
+
+There is **no first-party exemption** on the third row — an app you uploaded into your own
+workspace still needs that approval, because this scope **spends money**: the platform fronts the
+bill and meters it per workspace.
+
+⚠️ **The fourth row is not yours to move.** `ai:invoke` is a **paid** capability that follows the
+workspace's plan. So **do not make AI the only path through your app**: treat it as an
+enhancement, catch those two 403s, and degrade — a workspace that cannot get the capability
+should still find the rest of the app usable. An app that renders one full-page error is an app
+those customers cannot install at all.
 
 > ⚠️ `ai:invoke` is unrelated to the `ai` block in `manifest.json`. That block decides whether the
 > right-hand AI assistant is integrated into your app. This scope decides whether your backend can
@@ -363,6 +377,7 @@ app.post('/ask', async ctx => ctx.pt.ai.stream({
 | `PT_GATEWAY_NOT_BOUND` | 501 | Declare `ai:invoke` and publish again |
 | `TOKEN_MISSING` | 401 | This route is in `publicRoutes`, so there is no caller token |
 | `AI_SCOPE_DENIED` | 403 | An admin has not approved it yet |
+| `AI_NOT_ENTITLED` | 403 | **This workspace is not entitled to AI.** Follows the plan — you cannot fix this from the app; degrade instead |
 | `AI_BUDGET_EXCEEDED` | 429 | **The workspace's AI budget is spent.** Raise the limit or wait for the window — **retrying will not help** |
 | `AI_RATE_LIMITED` | 429 | Upstream throttling. This one *is* worth retrying |
 | `AI_UPSTREAM_FAILED` | 502 | Upstream's own failure; the message is passed through verbatim |
