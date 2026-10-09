@@ -51,6 +51,7 @@ What the runtime guarantees, so you must not re-implement it:
 | `ctx.files` | R2, keys auto-prefixed per app. Needs `backend.resources.files: true`, which is **rejected for customer apps** (`RESOURCE_NOT_ALLOWED`) — official apps only, and its prefixing is a runtime convention, not a platform-enforced boundary, so add `${ctx.workspaceId}/` to keys yourself |
 | `ctx.pt.query(queryType, params)` | Server-side Ptengine query — see [`data-queries.md`](data-queries.md). `ctx.pt.describe()` is not open yet (501) |
 | `ctx.pt.asset.*` | Write into the workspace asset library. Needs `asset:write` in `manifest.scopes` **and** an admin's approval. Four calls: `ensureFolder` / `create` / `update` / `uploadSource` — see [Writing to the asset library](#writing-to-the-asset-library-assetwrite) |
+| `ctx.pt.ai.*` | Call an LLM. Needs `ai:invoke` in `manifest.scopes` **and** an admin's approval. Two calls: `chat` (complete result) / `stream` (SSE `Response`) — see [Calling an LLM](#calling-an-llm-aiinvoke) |
 | `ctx.fetch(url, init)` | Outbound with a 10s default `timeoutMs` and structured logging; a caller-supplied `signal` still works. Whether a host is reachable is decided by the manifest's outbound allow-list, not by this call |
 | `ctx.secrets.X` / `ctx.vars.X` | Only names declared in the manifest resolve; anything else throws `SECRET_NOT_DECLARED` / `VAR_NOT_DECLARED` instead of yielding `undefined`. `PT_`-prefixed names are reserved and always refused. An empty string is a legitimate value. Secrets are references — a new value applies at once. Vars are baked into the worker at deploy time — after editing a var on the admin config page click **重新部署** (redeploy current version) to apply it; no new version upload is needed |
 | `ctx.requireScope(...)`, `ctx.error(status, code, detail)`, `ctx.log(msg, fields)`, `ctx.waitUntil(p)` | `detail` goes to logs only, never into the response. `ctx.log` emits one JSON line carrying `requestId` / `appId` / `versionId` / `route` / `userId` / `sid` |
@@ -306,6 +307,69 @@ product changes one. Let the call fail and surface the code.
 The app writes server-side. A user who already has the asset library open **will not see the new
 card for up to 5 minutes** — the product caches that list and there is no push channel. This is
 expected; do not "fix" it by writing twice. If the timing matters, tell the user to refresh.
+
+## Calling an LLM (`ai:invoke`)
+
+`ctx.pt.ai.*` calls a large language model through the platform gateway. **The credentials live
+on the platform side** — your app never sees them and cannot send its own.
+
+**Versions**: `ctx.pt.ai` exists from **`@ptengine/app-backend` 0.7.0**; `ai:invoke` passes
+manifest validation from **`@ptengine/app-sdk` 2.7.0**. On older packages `ctx.pt.ai` is simply
+not there.
+
+**Before anything works**: declare `"ai:invoke"` in `manifest.scopes`, publish, and have a
+workspace admin approve it once. There is **no first-party exemption** — an app you uploaded into
+your own workspace still needs that approval, because this scope **spends money**: the platform
+fronts the bill and meters it per workspace.
+
+> ⚠️ `ai:invoke` is unrelated to the `ai` block in `manifest.json`. That block decides whether the
+> right-hand AI assistant is integrated into your app. This scope decides whether your backend can
+> call a model. The names are close; the features are not.
+
+### Two calls, and the one that bites
+
+```ts
+// Complete result — the user waits for the whole generation.
+const res = await ctx.pt.ai.chat({
+    model: 'anthropic/claude-sonnet-5',          // provider prefix is REQUIRED
+    messages: [{ role: 'user', content: 'Summarise last week in one paragraph.' }],
+    max_tokens: 1024
+});
+return { text: res.choices[0].message.content };
+
+// Streaming — return the Response straight from your route.
+app.post('/ask', async ctx => ctx.pt.ai.stream({
+    model: 'anthropic/claude-sonnet-5',
+    messages: [{ role: 'user', content: ctx.body.question }]
+}));
+```
+
+1. **`model` must carry the provider prefix** (`anthropic/claude-sonnet-5`). A bare model name is
+   rejected upstream. The runtime does not add one for you — guessing the provider is worse than
+   failing.
+2. **Do not `await res.text()` on the streaming `Response` and forward that.** It buffers the whole
+   SSE stream and turns streaming into a single late response. Short answers look fine, so this
+   only shows up on the long ones — exactly the ones streaming was for. Use
+   `res.body!.getReader()` if you need to inspect it as it arrives.
+3. **`chat()` rejects `stream: true`** with 400 `PT_AI_BAD_INPUT`. Without that guard the call
+   would `json()` an SSE stream and throw an unexplainable parse error.
+4. Everything except `stream` is passed through untouched (`temperature`, `tools`, …). There is no
+   allow-list, so new upstream parameters work the day they ship.
+
+### The two 429s are not the same
+
+| Code | HTTP | What to do |
+| --- | --- | --- |
+| `PT_GATEWAY_NOT_BOUND` | 501 | Declare `ai:invoke` and publish again |
+| `TOKEN_MISSING` | 401 | This route is in `publicRoutes`, so there is no caller token |
+| `AI_SCOPE_DENIED` | 403 | An admin has not approved it yet |
+| `AI_BUDGET_EXCEEDED` | 429 | **The workspace's AI budget is spent.** Raise the limit or wait for the window — **retrying will not help** |
+| `AI_RATE_LIMITED` | 429 | Upstream throttling. This one *is* worth retrying |
+| `AI_UPSTREAM_FAILED` | 502 | Upstream's own failure; the message is passed through verbatim |
+
+**Never collapse those two 429s into one "please try again later".** One of them needs a human to
+go raise a limit; telling the user to retry sends them into a loop that only ends when the window
+rolls over, with no idea what happened.
 
 ## Diagnosis: backend symptom → cause
 
