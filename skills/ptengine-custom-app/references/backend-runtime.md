@@ -366,8 +366,10 @@ app.post('/ask', async ctx => ctx.pt.ai.stream({
 }));
 ```
 
-1. **`model` must carry the provider prefix** (`anthropic/claude-sonnet-5`). A bare model name is
-   rejected upstream. The runtime does not add one for you — guessing the provider is worse than
+1. **`model` must carry the provider prefix** (`anthropic/claude-sonnet-5`), and must be on the
+   allow-list. A bare name, a wildcard, or anything not on the list is rejected with
+   400 `AI_MODEL_NOT_ALLOWED` **and the error names every allowed model** — so you never have to
+   guess twice. The runtime does not add a prefix for you: guessing the provider is worse than
    failing.
 2. **Do not `await res.text()` on the streaming `Response` and forward that.** It buffers the whole
    SSE stream and turns streaming into a single late response. Short answers look fine, so this
@@ -378,6 +380,22 @@ app.post('/ask', async ctx => ctx.pt.ai.stream({
 4. Everything except `stream` is passed through untouched (`temperature`, `tools`, …). There is no
    allow-list, so new upstream parameters work the day they ship.
 
+### Which models can I use?
+
+**Read `scripts/rules.json` in the project — the `aiModels` field.** That file is generated from
+the platform contract and kept in sync by CI, so it is the list that is actually enforced, not a
+copy in prose that drifts. `ptx doctor` also prints it for any app declaring `ai:invoke`, and
+warns if your backend references a model that is not on it.
+
+At the time of writing it holds two entries (haiku and sonnet). **Do not assume a model exists
+because Cloudflare's model catalogue lists it** — that page shows what AI Gateway knows about,
+not what this gateway is configured and verified to serve.
+
+The list is deliberately narrow, and the expensive tier is deliberately absent: the spend budget
+is **one pot per environment**, not per workspace. An app that picks the priciest model is
+spending everyone's budget, and the rest of the environment gets 429 when it runs out. If you
+genuinely need a model that is not listed, that is a conversation, not a config tweak.
+
 ### The two 429s are not the same
 
 | Code | HTTP | What to do |
@@ -387,6 +405,7 @@ app.post('/ask', async ctx => ctx.pt.ai.stream({
 | `AI_SCOPE_DENIED` | 403 | An admin has not approved it **or** the workspace is not entitled. **You cannot tell which** — see below |
 | `AI_BUDGET_EXCEEDED` | 429 | **The workspace's AI budget is spent.** Raise the limit or wait for the window — **retrying will not help** |
 | `AI_RATE_LIMITED` | 429 | Upstream throttling. This one *is* worth retrying |
+| `AI_MODEL_NOT_ALLOWED` | 400 | The model is not on the allow-list. **The error lists the allowed ones** |
 | `AI_UPSTREAM_FAILED` | 502 | Upstream's own failure; the message is passed through verbatim |
 
 **Never collapse those two 429s into one "please try again later".** One of them needs a human to
