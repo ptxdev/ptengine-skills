@@ -387,14 +387,17 @@ the platform contract and kept in sync by CI, so it is the list that is actually
 copy in prose that drifts. `ptx doctor` also prints it for any app declaring `ai:invoke`, and
 warns if your backend references a model that is not on it.
 
-At the time of writing it holds two entries (haiku and sonnet). **Do not assume a model exists
-because Cloudflare's model catalogue lists it** — that page shows what AI Gateway knows about,
-not what this gateway is configured and verified to serve.
+It spans Anthropic, OpenAI and Google. **Do not assume a model exists because Cloudflare's model
+catalogue lists it** — that page shows what AI Gateway knows about, not what this gateway is
+configured and verified to serve, and the exact id spelling is easy to get subtly wrong
+(`claude-haiku-4-5-20251001` vs the catalogue's `claude-haiku-4.5`). Read `rules.json`, not the
+catalogue.
 
-The list is deliberately narrow, and the expensive tier is deliberately absent: the spend budget
-is **one pot per environment**, not per workspace. An app that picks the priciest model is
-spending everyone's budget, and the rest of the environment gets 429 when it runs out. If you
-genuinely need a model that is not listed, that is a conversation, not a config tweak.
+**Pick the cheapest model that does the job.** The spend budget is **one pot per environment**,
+not per workspace: an app running everything through a top-tier model is spending everyone's
+budget, and when it runs out the whole environment gets 429. A summarisation or classification
+step almost never needs the flagship — reach for the fast tier first and move up only when you
+can tell the difference.
 
 ### The two 429s are not the same
 
