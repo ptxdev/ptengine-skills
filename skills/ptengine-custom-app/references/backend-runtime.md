@@ -50,7 +50,8 @@ What the runtime guarantees, so you must not re-implement it:
 | `ctx.kv` | KV. Needs `backend.resources.kv: true`. Minimum `expirationTtl` is 60s |
 | `ctx.files` | R2, keys auto-prefixed per app. Needs `backend.resources.files: true`, which is **rejected for customer apps** (`RESOURCE_NOT_ALLOWED`) — official apps only, and its prefixing is a runtime convention, not a platform-enforced boundary, so add `${ctx.workspaceId}/` to keys yourself |
 | `ctx.pt.query(queryType, params)` | Server-side Ptengine query — see [`data-queries.md`](data-queries.md). `ctx.pt.describe()` is not open yet (501) |
-| `ctx.pt.asset.*` | Write into the workspace asset library. Needs `asset:write` in `manifest.scopes` **and** an admin's approval. Four calls: `ensureFolder` / `create` / `update` / `uploadSource` — see [Writing to the asset library](#writing-to-the-asset-library-assetwrite) |
+| `ctx.pt.asset.list` / `sharedWithMe` / `get` | **Read** the calling user's Drive assets (`@ptengine/app-backend` ≥ 0.8.0). Needs `asset:read` in `manifest.scopes`; same registry and result shape as the bridge's `PtApp.asset.*` — see [`assets.md`](assets.md) |
+| `ctx.pt.asset.ensureFolder` / `create` / `update` / `uploadSource` | **Write** into the workspace asset library. Needs `asset:write` in `manifest.scopes` **and** an admin's approval — see [Writing to the asset library](#writing-to-the-asset-library-assetwrite) |
 | `ctx.pt.ai.*` | Call an LLM. Needs `ai:invoke` in `manifest.scopes` **and** an admin's approval. Two calls: `chat` (complete result) / `stream` (SSE `Response`) — see [Calling an LLM](#calling-an-llm-aiinvoke) |
 | `ctx.fetch(url, init)` | Outbound with a 10s default `timeoutMs` and structured logging; a caller-supplied `signal` still works. Whether a host is reachable is decided by the manifest's outbound allow-list, not by this call |
 | `ctx.secrets.X` / `ctx.vars.X` | Only names declared in the manifest resolve; anything else throws `SECRET_NOT_DECLARED` / `VAR_NOT_DECLARED` instead of yielding `undefined`. `PT_`-prefixed names are reserved and always refused. An empty string is a legitimate value. Secrets are references — a new value applies at once. Vars are baked into the worker at deploy time — after editing a var on the admin config page click **重新部署** (redeploy current version) to apply it; no new version upload is needed |
@@ -282,9 +283,9 @@ product changes one. Let the call fail and surface the code.
 
 | Symptom | Cause |
 | --- | --- |
-| 501 `PT_GATEWAY_NOT_BOUND` | `asset:write` not in `manifest.scopes`, or that version is not published yet |
+| 501 `PT_GATEWAY_NOT_BOUND` | `manifest.scopes` has neither `asset:write` nor any data scope (`analytics:read` / `profile:read` / `user:read` / `openapi:read` / `asset:read`), or that version is not published yet. Other data scopes declared but `asset:write` missing → 403 `SCOPE_DENIED` |
 | 403 `SCOPE_DENIED` | The token carries no `asset:write` — an admin has not approved it, or has revoked it |
-| 403 `ASSET_FORBIDDEN` | The **calling user** cannot write that folder/asset. The token is user-bound: the app never exceeds the person using it |
+| 403 `FORBIDDEN` | The **calling user** cannot write that folder/asset. The token is user-bound: the app never exceeds the person using it |
 | 413 `ASSET_TOO_LARGE` | File over 20 MiB |
 | 415 `ASSET_TYPE_REJECTED` | `contentType` outside the allow-list above |
 | 429 | Per-app write concurrency cap (2 in flight; reads have their own, separate budget of 6) |
@@ -422,9 +423,9 @@ rolls over, with no idea what happened.
 | 401 `TOKEN_MISSING` / `TOKEN_SIGNATURE_INVALID` / `TOKEN_AUD_MISMATCH` / `TOKEN_EXPIRED` / `TOKEN_CLAIMS_INCOMPLETE` | No `Authorization: Bearer …` header (hand-written `fetch` instead of the `api()` helper), a token minted for another app, or an expired one. Locally it usually means `vite` was started directly rather than `npm run dev`, so nothing signs tokens |
 | 404 on a route you did write | The route key is missing from `routes`, carries an `/api` prefix, or a `:param` route was declared before the static route it shadows |
 | 500 `AUTH_NOT_AVAILABLE` | `ctx.auth` read on a route listed in `publicRoutes` — use `ctx.authOrNull` there, or take the route out of the list |
-| 501 `PT_GATEWAY_NOT_BOUND` | No data scope in `manifest.scopes`, or the version declaring it is not published and admin-approved yet. `ctx.pt.describe()` always returns this |
+| 501 `PT_GATEWAY_NOT_BOUND` | No data scope in `manifest.scopes` (including `asset:read` / `asset:write` / `ai:invoke`), or the version declaring it is not published yet. The gateway is bound at deploy time from the manifest — admin approval does not affect it (a missing approval shows up as 403 `SCOPE_DENIED` instead). `ctx.pt.describe()` always returns this |
 | 403 `SCOPE_REQUIRED` | The caller's token lacks the scope `ctx.requireScope()` demands — declare it and have an admin approve the new version |
-| 403 `SCOPE_DENIED` on `ctx.pt.asset.*` | Not the same as `SCOPE_REQUIRED`: the token reached the asset endpoint without `asset:write`. Write scopes get **no first-party exemption**, so even your own app needs an admin to approve it once (and a revoke takes it back immediately) |
+| 403 `SCOPE_DENIED` on `ctx.pt.asset.ensureFolder` / `create` / `update` / `uploadSource` | Not the same as `SCOPE_REQUIRED`: the token reached the asset endpoint without `asset:write`. Write scopes get **no first-party exemption**, so even your own app needs an admin to approve it once (and a revoke takes it back immediately). The read calls (`list` / `sharedWithMe` / `get`) return the same `SCOPE_DENIED` without `asset:read`; an app the workspace built itself only needs to declare that scope, no approval — see [`assets.md`](assets.md) |
 | An asset is created but shows up as a card with a title and no body | `content` was not the `PtAssetDoc` envelope — `name` and `content` are both required and both must be strings. Nothing errors on this path; see [Writing to the asset library](#writing-to-the-asset-library-assetwrite) |
 | 500 `SECRET_NOT_DECLARED` / `VAR_NOT_DECLARED` | The name is not declared in the manifest, has no value on the admin page, or is missing from `backend/.dev.vars`. `PT_`-prefixed names always fail |
 | Value changed on the admin page but the worker still reads the old one | Config is baked in at publish time — **republish**. Credentials take effect immediately, so this never applies to them |

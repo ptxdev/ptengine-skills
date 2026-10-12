@@ -5,7 +5,7 @@ Two paths, one contract, one result shape `{ columns, rows, rowCount, metadata }
 | Path | Where | Needs |
 | --- | --- | --- |
 | `await window.PtApp.data.query(req)` | browser, host-mediated | nothing beyond being loaded by the platform |
-| `await ctx.pt.query(queryType, params)` | backend worker | a data scope in `manifest.scopes`, published and approved — otherwise 501 `PT_GATEWAY_NOT_BOUND` |
+| `await ctx.pt.query(queryType, params)` | backend worker | a data scope in `manifest.scopes`, published and approved — no data scope (nor `asset:write`) at all, or not published → 501 `PT_GATEWAY_NOT_BOUND`; declared but not approved / missing the needed one → 403 `SCOPE_DENIED` |
 
 Use the backend path when you must join analytics with your own stored data, keep
 person-level rows out of the browser, or post-process server-side. Use the bridge for
@@ -68,7 +68,7 @@ validate the question with `Run-Query`, then port the params. The companion skil
 
 ## Normalizing two sources into one shape
 
-An app that supports both paths (useful while a gateway binding is still being approved)
+An app that supports both paths (useful while its data scope is still awaiting admin approval)
 should convert each source into **one internal signal type immediately**, then share all
 downstream code. Validate and narrow anything the browser posted to the backend — column
 names allow-listed, row count capped, types checked — because a client-supplied result is
