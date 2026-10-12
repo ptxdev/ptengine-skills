@@ -24,7 +24,7 @@ reading another's rows) — follow the rules instead of iterating on symptoms.
 | Storage | None, or per-browser `localStorage` | D1 / KV — state shared across users, sessions and devices |
 | Credentials | None (the bundle is publicly fetchable) | Third-party credentials held server-side + a declared outbound host allow-list |
 | Compute | Whatever the browser can do while the user waits | Large result sets, post-processing, background work via `ctx.waitUntil` |
-| Permissions | Bridge-usable scopes such as `asset:read` / `ui:notify`; never backend-only ones (`openapi:read`, `asset:write`) | Needs `user:read` or similar, so consent and its incremental-approval design matter |
+| Permissions | Bridge-usable scopes such as `asset:read` / `ui:notify`; never backend-only ones (`openapi:read`, `asset:write`, `ai:invoke`) | Needs `user:read` or similar, so consent and its incremental-approval design matter |
 
 When unsure, **build the light app first** — faster to ship and impossible to leak tenant
 data from. Both tracks and the 1 → 2 upgrade path: [`references/tracks.md`](references/tracks.md).
@@ -131,7 +131,7 @@ Capability table, tenancy rules, local `.dev.vars` setup and proven patterns:
 `export default createApp<ApiRoutes>({ routes, publicRoutes })`: every route is authenticated
 unless its exact key is listed in `publicRoutes` (no wildcards, and no `ctx.auth` there).
 
-`ctx` is the whole surface (`auth` · `workspaceId` · `db` · `kv` · `pt.query` / `pt.asset` · `fetch`
+`ctx` is the whole surface (`auth` · `workspaceId` · `db` · `kv` · `pt.query` / `pt.asset` / `pt.ai` · `fetch`
 · `secrets`/`vars` · `requireScope` · `error` · `log` …) — the field-by-field table, what is **not**
 available (Durable Objects, Queues, Cron Triggers, `connect()`, `request.cf`) and the vars-need-「重新部署」
 / secrets-apply-at-once rule are in `backend-runtime.md`. Non-negotiables: **never touch `env`
@@ -185,9 +185,9 @@ wirings intact (Tailwind preset, `content` glob into the package `dist`, `tokens
 ## Manifest
 
 - `version` belongs to the app and **must increase on every upload** (`package.json` version is ignored). `schemaVersion`: `1` = front end only, `2` = may carry `backend`.
-- `scopes`: `analytics:read`, `profile:read`, `user:read`, `ui:notify`, `openapi:read`, `asset:read`, `asset:write` — nothing else validates. Data scopes decide whether the backend gets a data gateway at all and drive the admin consent dialog: declare the minimum, ask for more in a later version.
-  `openapi:read` = call the Open API from the backend with a profile API key; per-app key → single-workspace apps only. `asset:read` = read the user's Drive assets, bridge or backend (`references/assets.md`; needs `@ptengine/app-sdk` ≥ 2.8.0 / `@ptengine/app-backend` ≥ 0.8.0). `asset:write` = write into the workspace asset library from the backend (`ctx.pt.asset.ensureFolder/create/update/uploadSource`), **backend track only**, and the one scope with
-  no first-party exemption — an admin must approve it once before the first write ever succeeds. `openapi:read` / `asset:write`: `backend-runtime.md`; consent semantics: `publish-and-operate.md`.
+- `scopes`: `analytics:read`, `profile:read`, `user:read`, `ui:notify`, `openapi:read`, `asset:read`, `asset:write`, `ai:invoke` — nothing else validates. Data scopes decide whether the backend gets a data gateway at all and drive the admin consent dialog: declare the minimum, ask for more in a later version.
+  `openapi:read` = call the Open API from the backend with a profile API key; per-app key → single-workspace apps only. `asset:read` = read the user's Drive assets, bridge or backend (`references/assets.md`; needs `@ptengine/app-sdk` ≥ 2.8.0 / `@ptengine/app-backend` ≥ 0.8.0). `asset:write` = write into the workspace asset library (`ctx.pt.asset.ensureFolder/create/update/uploadSource`); `ai:invoke` = call an LLM (`ctx.pt.ai.*`, credentials stay platform-side). Those two are **backend track only** and have **no first-party exemption** — an admin must approve each once, even for an app you uploaded yourself; `ai:invoke` is in that group because it **costs money** (platform fronts the bill, metered per workspace) — and it is a **paid capability that follows the workspace's plan**, so declaring it is not enough and you cannot move that part: never make AI the only path through your app.
+  ⚠️ `ai:invoke` is **unrelated to the manifest's `ai` block** (that one integrates the right-hand AI assistant). `openapi:read` / `asset:write` / `ai:invoke`: `backend-runtime.md`; consent semantics: `publish-and-operate.md`.
 - `backend` (entry under `_backend/`, `routes` exactly `["/api/*"]`, resources, migrations,
   credential/config names, outbound allow-list, `compatibilityDate`): `backend-runtime.md`.
 - `display_name` / `icon` (zip-relative, must exist): **every upload overwrites the app's

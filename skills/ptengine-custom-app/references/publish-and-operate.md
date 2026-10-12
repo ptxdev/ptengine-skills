@@ -95,7 +95,7 @@ Two consequences worth designing for:
 - Design the backend so a rollback to the previous, narrower version still
   works: put `ctx.requireScope()` only on routes that genuinely read platform
   data, so the rest of the app degrades instead of failing wholesale.
-- **Write scopes (`asset:write`) do not behave like read scopes here.** Read
+- **Write scopes (`asset:write`, `ai:invoke`) do not behave like read scopes here.** Read
   scopes are implicitly granted for apps the workspace built itself, so in
   practice their dialog never appears and "revoke" has nothing to take away. A
   write scope has **no such exemption**: it only ever comes from a stored,
@@ -106,6 +106,26 @@ Two consequences worth designing for:
 - Consequently an app declaring `asset:write` **cannot write before an admin has
   clicked once**. Make that a first-run state in the UI, not an error path: the
   403 you get until then is the designed behaviour, not a bug to retry around.
+- `ai:invoke` sits in the write group for a different reason: it does not write
+  anything, it **spends money**. The platform fronts the bill and meters usage
+  per workspace, so the same "one explicit, revocable approval" rule applies —
+  an exemption would mean anyone who can upload an app into their own workspace
+  can start spending. The consent dialog's wording says so in all three
+  languages; keep your own UI honest about it too.
+- **`ai:invoke` is also gated by the workspace's plan, and that gate is not the
+  consent dialog.** Two different causes, **one indistinguishable error**: an
+  admin not having clicked approve, and the workspace not being entitled at all,
+  both surface as 403 `AI_SCOPE_DENIED` (when a workspace is not entitled the
+  platform never signs the scope into the token, so the gateway cannot tell why).
+  The distinction lives only in platform-side logs. Design for the second case:
+  AI must not be the only path through the app, or customers without the
+  entitlement simply cannot use what you shipped — and do not word the error as
+  "ask your admin", which sends half of them to someone who cannot help.
+- Budget is enforced on the platform side, not in your app. When it runs out the
+  backend gets 429 `AI_BUDGET_EXCEEDED` — **a state that needs a human**, not a
+  retry. Surface it as "this workspace's AI budget is used up", never as
+  "please try again later": there is no `Retry-After`, so you cannot tell the
+  user when it recovers, and retrying only loops until the window rolls over.
 
 ## Configuration vs credentials, at operating time
 

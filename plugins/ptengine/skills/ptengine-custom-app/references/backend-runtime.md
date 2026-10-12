@@ -52,6 +52,7 @@ What the runtime guarantees, so you must not re-implement it:
 | `ctx.pt.query(queryType, params)` | Server-side Ptengine query — see [`data-queries.md`](data-queries.md). `ctx.pt.describe()` is not open yet (501) |
 | `ctx.pt.asset.list` / `sharedWithMe` / `get` | **Read** the calling user's Drive assets (`@ptengine/app-backend` ≥ 0.8.0). Needs `asset:read` in `manifest.scopes`; same registry and result shape as the bridge's `PtApp.asset.*` — see [`assets.md`](assets.md) |
 | `ctx.pt.asset.ensureFolder` / `create` / `update` / `uploadSource` | **Write** into the workspace asset library. Needs `asset:write` in `manifest.scopes` **and** an admin's approval — see [Writing to the asset library](#writing-to-the-asset-library-assetwrite) |
+| `ctx.pt.ai.*` | Call an LLM. Needs `ai:invoke` in `manifest.scopes` **and** an admin's approval. Two calls: `chat` (complete result) / `stream` (SSE `Response`) — see [Calling an LLM](#calling-an-llm-aiinvoke) |
 | `ctx.fetch(url, init)` | Outbound with a 10s default `timeoutMs` and structured logging; a caller-supplied `signal` still works. Whether a host is reachable is decided by the manifest's outbound allow-list, not by this call |
 | `ctx.secrets.X` / `ctx.vars.X` | Only names declared in the manifest resolve; anything else throws `SECRET_NOT_DECLARED` / `VAR_NOT_DECLARED` instead of yielding `undefined`. `PT_`-prefixed names are reserved and always refused. An empty string is a legitimate value. Secrets are references — a new value applies at once. Vars are baked into the worker at deploy time — after editing a var on the admin config page click **重新部署** (redeploy current version) to apply it; no new version upload is needed |
 | `ctx.requireScope(...)`, `ctx.error(status, code, detail)`, `ctx.log(msg, fields)`, `ctx.waitUntil(p)` | `detail` goes to logs only, never into the response. `ctx.log` emits one JSON line carrying `requestId` / `appId` / `versionId` / `route` / `userId` / `sid` |
@@ -308,6 +309,113 @@ The app writes server-side. A user who already has the asset library open **will
 card for up to 5 minutes** — the product caches that list and there is no push channel. This is
 expected; do not "fix" it by writing twice. If the timing matters, tell the user to refresh.
 
+## Calling an LLM (`ai:invoke`)
+
+`ctx.pt.ai.*` calls a large language model through the platform gateway. **The credentials live
+on the platform side** — your app never sees them and cannot send its own.
+
+**Versions**: `ctx.pt.ai` exists from **`@ptengine/app-backend` 0.7.0**; `ai:invoke` passes
+manifest validation from **`@ptengine/app-sdk` 2.7.0**. On older packages `ctx.pt.ai` is simply
+not there.
+
+**Before anything works**, four things must hold **at the same time**:
+
+| | Who moves it | If missing |
+| --- | --- | --- |
+| `"ai:invoke"` in `manifest.scopes`, published | you | 501 `PT_GATEWAY_NOT_BOUND` |
+| `@ptengine/app-backend` ≥ 0.7.0 | you | `ctx.pt.ai` is simply not there |
+| A workspace admin approved it **once** | the workspace admin | 403 `AI_SCOPE_DENIED` |
+| **The workspace is entitled to AI** | platform / sales side | also 403 `AI_SCOPE_DENIED` (see below) |
+
+There is **no first-party exemption** on the third row — an app you uploaded into your own
+workspace still needs that approval, because this scope **spends money**: the platform fronts the
+bill and meters it per workspace.
+
+⚠️ **The last two rows produce the identical error.** When a workspace is not entitled, the
+platform never signs `ai:invoke` into the token at all — the gateway only sees "that scope is not
+here" and cannot tell why. The distinction exists only in platform-side logs.
+
+So **do not word that error as "ask your admin to approve it"**: for a workspace that is not
+entitled, that sends the user to someone who cannot fix it. Say something like "AI is not
+available for this workspace" and give them a way to reach support.
+
+⚠️ **The fourth row is not yours to move.** `ai:invoke` is a **paid** capability that follows the
+workspace's plan. So **do not make AI the only path through your app**: treat it as an
+enhancement, catch those two 403s, and degrade — a workspace that cannot get the capability
+should still find the rest of the app usable. An app that renders one full-page error is an app
+those customers cannot install at all.
+
+> ⚠️ `ai:invoke` is unrelated to the `ai` block in `manifest.json`. That block decides whether the
+> right-hand AI assistant is integrated into your app. This scope decides whether your backend can
+> call a model. The names are close; the features are not.
+
+### Two calls, and the one that bites
+
+```ts
+// Complete result — the user waits for the whole generation.
+const res = await ctx.pt.ai.chat({
+    model: 'anthropic/claude-sonnet-5',          // provider prefix is REQUIRED
+    messages: [{ role: 'user', content: 'Summarise last week in one paragraph.' }],
+    max_tokens: 1024
+});
+return { text: res.choices[0].message.content };
+
+// Streaming — return the Response straight from your route.
+app.post('/ask', async ctx => ctx.pt.ai.stream({
+    model: 'anthropic/claude-sonnet-5',
+    messages: [{ role: 'user', content: ctx.body.question }]
+}));
+```
+
+1. **`model` must carry the provider prefix** (`anthropic/claude-sonnet-5`), and must be on the
+   allow-list. A bare name, a wildcard, or anything not on the list is rejected with
+   400 `AI_MODEL_NOT_ALLOWED` **and the error names every allowed model** — so you never have to
+   guess twice. The runtime does not add a prefix for you: guessing the provider is worse than
+   failing.
+2. **Do not `await res.text()` on the streaming `Response` and forward that.** It buffers the whole
+   SSE stream and turns streaming into a single late response. Short answers look fine, so this
+   only shows up on the long ones — exactly the ones streaming was for. Use
+   `res.body!.getReader()` if you need to inspect it as it arrives.
+3. **`chat()` rejects `stream: true`** with 400 `PT_AI_BAD_INPUT`. Without that guard the call
+   would `json()` an SSE stream and throw an unexplainable parse error.
+4. Everything except `stream` is passed through untouched (`temperature`, `tools`, …). There is no
+   allow-list, so new upstream parameters work the day they ship.
+
+### Which models can I use?
+
+**Read `scripts/rules.json` in the project — the `aiModels` field.** That file is generated from
+the platform contract and kept in sync by CI, so it is the list that is actually enforced, not a
+copy in prose that drifts. `ptx doctor` also prints it for any app declaring `ai:invoke`, and
+warns if your backend references a model that is not on it.
+
+It spans Anthropic, OpenAI and Google. **Do not assume a model exists because Cloudflare's model
+catalogue lists it** — that page shows what AI Gateway knows about, not what this gateway is
+configured and verified to serve, and the exact id spelling is easy to get subtly wrong
+(`claude-haiku-4-5-20251001` vs the catalogue's `claude-haiku-4.5`). Read `rules.json`, not the
+catalogue.
+
+**Pick the cheapest model that does the job.** The spend budget is **one pot per environment**,
+not per workspace: an app running everything through a top-tier model is spending everyone's
+budget, and when it runs out the whole environment gets 429. A summarisation or classification
+step almost never needs the flagship — reach for the fast tier first and move up only when you
+can tell the difference.
+
+### The two 429s are not the same
+
+| Code | HTTP | What to do |
+| --- | --- | --- |
+| `PT_GATEWAY_NOT_BOUND` | 501 | Declare `ai:invoke` and publish again |
+| `TOKEN_MISSING` | 401 | This route is in `publicRoutes`, so there is no caller token |
+| `AI_SCOPE_DENIED` | 403 | An admin has not approved it **or** the workspace is not entitled. **You cannot tell which** — see below |
+| `AI_BUDGET_EXCEEDED` | 429 | **The workspace's AI budget is spent.** Raise the limit or wait for the window — **retrying will not help** |
+| `AI_RATE_LIMITED` | 429 | Upstream throttling. This one *is* worth retrying |
+| `AI_MODEL_NOT_ALLOWED` | 400 | The model is not on the allow-list. **The error lists the allowed ones** |
+| `AI_UPSTREAM_FAILED` | 502 | Upstream's own failure; the message is passed through verbatim |
+
+**Never collapse those two 429s into one "please try again later".** One of them needs a human to
+go raise a limit; telling the user to retry sends them into a loop that only ends when the window
+rolls over, with no idea what happened.
+
 ## Diagnosis: backend symptom → cause
 
 | Symptom | Cause and fix |
@@ -315,7 +423,7 @@ expected; do not "fix" it by writing twice. If the timing matters, tell the user
 | 401 `TOKEN_MISSING` / `TOKEN_SIGNATURE_INVALID` / `TOKEN_AUD_MISMATCH` / `TOKEN_EXPIRED` / `TOKEN_CLAIMS_INCOMPLETE` | No `Authorization: Bearer …` header (hand-written `fetch` instead of the `api()` helper), a token minted for another app, or an expired one. Locally it usually means `vite` was started directly rather than `npm run dev`, so nothing signs tokens |
 | 404 on a route you did write | The route key is missing from `routes`, carries an `/api` prefix, or a `:param` route was declared before the static route it shadows |
 | 500 `AUTH_NOT_AVAILABLE` | `ctx.auth` read on a route listed in `publicRoutes` — use `ctx.authOrNull` there, or take the route out of the list |
-| 501 `PT_GATEWAY_NOT_BOUND` | No data scope in `manifest.scopes` (including `asset:read` / `asset:write`), or the version declaring it is not published yet. The gateway is bound at deploy time from the manifest — admin approval does not affect it (a missing approval shows up as 403 `SCOPE_DENIED` instead). `ctx.pt.describe()` always returns this |
+| 501 `PT_GATEWAY_NOT_BOUND` | No data scope in `manifest.scopes` (including `asset:read` / `asset:write` / `ai:invoke`), or the version declaring it is not published yet. The gateway is bound at deploy time from the manifest — admin approval does not affect it (a missing approval shows up as 403 `SCOPE_DENIED` instead). `ctx.pt.describe()` always returns this |
 | 403 `SCOPE_REQUIRED` | The caller's token lacks the scope `ctx.requireScope()` demands — declare it and have an admin approve the new version |
 | 403 `SCOPE_DENIED` on `ctx.pt.asset.ensureFolder` / `create` / `update` / `uploadSource` | Not the same as `SCOPE_REQUIRED`: the token reached the asset endpoint without `asset:write`. Write scopes get **no first-party exemption**, so even your own app needs an admin to approve it once (and a revoke takes it back immediately). The read calls (`list` / `sharedWithMe` / `get`) return the same `SCOPE_DENIED` without `asset:read`; an app the workspace built itself only needs to declare that scope, no approval — see [`assets.md`](assets.md) |
 | An asset is created but shows up as a card with a title and no body | `content` was not the `PtAssetDoc` envelope — `name` and `content` are both required and both must be strings. Nothing errors on this path; see [Writing to the asset library](#writing-to-the-asset-library-assetwrite) |
