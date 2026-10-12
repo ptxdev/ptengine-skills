@@ -38,8 +38,8 @@ data from. Both tracks and the 1 → 2 upgrade path: [`references/tracks.md`](re
    inside `@ptengine/app-sdk` outrank both.
 3. Settle the track above before writing code — it decides `schemaVersion`, the manifest
    shape and the whole publish flow ([`references/tracks.md`](references/tracks.md)).
-4. If the app reads Ptengine data, **set up the Ptengine MCP server first** and validate
-   every query there; before writing UI, read `@ptengine/design-components`' `llms.txt`.
+4. Reads Ptengine data → **set up the Ptengine MCP server first** and validate every query there;
+   reads assets → read `@ptengine/app-sdk`'s `asset-read.llms.txt`; before UI → `@ptengine/design-components`' `llms.txt`.
 5. Build, keeping the invariants below intact. Then **`npm run doctor`, build, package**, and
    hand the zip to the admin flow ([`references/publish-and-operate.md`](references/publish-and-operate.md)).
 

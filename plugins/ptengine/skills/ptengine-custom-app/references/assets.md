@@ -26,8 +26,10 @@ rules — `asset:write`, backend only, see `backend-runtime.md`.)
   yet. `studio.sources[].textContent` is **omitted unless** `include: ['sourceText']` (can be large).
 - Node types on a list: `folder page group image component font studio shortcut`; `insight` is not open.
 
-Full field lists: `asset-read.schema.json` in `@ptengine/app-sdk` (the TypeScript types are generated
-from it) — read it instead of guessing field names.
+**Before writing asset code, read `node_modules/@ptengine/app-sdk/asset-read.llms.txt`** — the readable
+contract: every node type's fields, the four detail shapes, inputs, paging rules and error codes.
+`asset-read.schema.json` (same package) is the machine-readable source the TypeScript types are
+generated from; read it for exact nullability. Never guess field names.
 
 ## Errors pass through verbatim
 
