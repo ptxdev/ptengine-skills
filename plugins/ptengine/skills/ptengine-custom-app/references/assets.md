@@ -5,8 +5,8 @@ assets that user can see in Ptengine's Drive — never more.
 
 | Path | Where | Needs |
 | --- | --- | --- |
-| Bridge | `window.PtApp.asset.list / sharedWithMe / get` (`@ptengine/app-sdk` ≥ 2.7.0) | `asset:read` in `manifest.scopes`; feature-detect with `if (PtApp.asset)` — an older host has no `asset` |
-| Backend | `ctx.pt.asset.list / sharedWithMe / get` (`@ptengine/app-backend` ≥ 0.7.0) | same scope in a **published** version. 501 `PT_GATEWAY_NOT_BOUND` only when the manifest declares neither any data scope (`analytics:read` / `profile:read` / `user:read` / `openapi:read` / `asset:read`) nor `asset:write` (or that version is not published yet) — the gateway is bound at deploy time from the manifest, regardless of approval. Other data scopes declared but `asset:read` missing, or an external app not yet approved → 403 `SCOPE_DENIED` (`requiredScope: 'asset:read'`) instead |
+| Bridge | `window.PtApp.asset.list / sharedWithMe / get` (`@ptengine/app-sdk` ≥ 2.8.0) | `asset:read` in `manifest.scopes`; feature-detect with `if (PtApp.asset)` — an older host has no `asset` |
+| Backend | `ctx.pt.asset.list / sharedWithMe / get` (`@ptengine/app-backend` ≥ 0.8.0) | same scope in a **published** version. 501 `PT_GATEWAY_NOT_BOUND` only when the manifest declares neither any data scope (`analytics:read` / `profile:read` / `user:read` / `openapi:read` / `asset:read`) nor `asset:write` (or that version is not published yet) — the gateway is bound at deploy time from the manifest, regardless of approval. Other data scopes declared but `asset:read` missing, or an external app not yet approved → 403 `SCOPE_DENIED` (`requiredScope: 'asset:read'`) instead |
 
 `asset:read` is a **read** scope: an app built and uploaded by the workspace itself is implicitly
 authorized; store / external apps need admin consent. (Writing is a different scope with different
