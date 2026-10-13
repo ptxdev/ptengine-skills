@@ -15,7 +15,9 @@ rules — `asset:write`, backend only, see `backend-runtime.md`.)
 ## Shapes
 
 - `list({ folderId?, types?, keyword?, scope?, cursor?, size? })` → `{ items, nextCursor, hasMore }`.
-  Omit `folderId` for the root. `scope` is `children` (default) or `subtree`. Cursor paging only:
+  Omit `folderId` for the root. `keyword` matches names **inside that one folder only**; `scope` is
+  `children` (default) or `subtree` (also match inside its sub-folders) — no `folderId` means no
+  cross-tree search (see [Searching is per folder](#searching-is-per-folder)). Cursor paging only:
   pass back `nextCursor`; **trust `hasMore`, not `items.length`** (short pages are normal).
   `size` 1..100, default 50.
 - `sharedWithMe({ cursor?, size? })` → same shape. Top-level nodes shared to the user from other
@@ -23,8 +25,22 @@ rules — `asset:write`, backend only, see `backend-runtime.md`.)
 - `get({ type, id, include? })` → detail. `type` is **only** `folder | page | group | studio`.
   `image` / `font` / `shortcut` carry all their fields on the list node (`url`, `familyName`,
   `targetType` / `targetId` …) — call `get` on a shortcut's target instead. `component` is not open
-  yet. `studio.sources[].textContent` is **omitted unless** `include: ['sourceText']` (can be large).
+  yet. `studio.sources[].textContent` is **omitted unless** `include: ['sourceText']` (can be large),
+  and even then exists **only for text sources** — uploaded files are `null`, read their `url`.
 - Node types on a list: `folder page group image component font studio shortcut`; `insight` is not open.
+
+## Searching is per folder; `textContent` is text-only
+
+**Searching is per folder.** `keyword` matches names inside one folder: pass its `folderId`; add
+`scope: 'subtree'` to also match inside its sub-folders. Without `folderId` there is **no cross-tree
+search** — the root listing only matches the root's own entries (for users with restricted
+permissions, just their visible top-level entries). This mirrors the product's own Drive search,
+which searches the open folder. To find something you wrote, start from the folder you wrote it
+into (e.g. the one `ensureFolder` returned).
+
+**`textContent` exists only for text sources** — text pasted in the product UI
+(`sources[].type === 'text'`). Files added with `uploadSource` (or uploaded in the UI) are
+`file` / `image` sources: their `textContent` is always `null`, and their content is at `url`.
 
 ## Ids: read nodes vs. write calls
 
@@ -56,7 +72,8 @@ error frame without a code.
 Bridge asset calls share the host's queue with `data.query`: 4 in flight, 50 queued. A route change
 (including `nav.syncRoute`) cancels queued calls with `QUERY_CANCELLED`; a full queue rejects with
 `QUERY_QUEUE_FULL`. When walking recursively keep 2–3 calls in flight — never `Promise.all` a whole
-level.
+level. To locate something by name, search the folder you expect it in (see above) — a root-level
+`keyword` will not find it deeper down.
 
 ## Hard rules
 

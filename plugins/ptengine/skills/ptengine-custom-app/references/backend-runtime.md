@@ -287,6 +287,9 @@ the product's own, shared with manual uploads in the UI:
 Do not re-check these before calling — a second copy of a business rule drifts the moment the
 product changes one. Let the call fail and surface the code.
 
+Read back with `get`, an uploaded file is a `file` / `image` source: its `textContent` is always
+`null` — its content is at `url` (only text pasted in the product UI has `textContent`).
+
 | Symptom | Cause |
 | --- | --- |
 | 501 `PT_GATEWAY_NOT_BOUND` | `manifest.scopes` has neither `asset:write` nor any data scope (`analytics:read` / `profile:read` / `user:read` / `openapi:read` / `asset:read`), or that version is not published yet. Other data scopes declared but `asset:write` missing → 403 `SCOPE_DENIED` |
