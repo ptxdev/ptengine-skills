@@ -71,8 +71,9 @@ error frame without a code.
 
 Bridge asset calls share the host's queue with `data.query`: 4 in flight, 50 queued. A route change
 (including `nav.syncRoute`) cancels queued calls with `QUERY_CANCELLED`; a full queue rejects with
-`QUERY_QUEUE_FULL`. When walking recursively keep 2–3 calls in flight — never `Promise.all` a whole
-level. To locate something by name, search the folder you expect it in (see above) — a root-level
+`QUERY_QUEUE_FULL`. When walking recursively keep **at most 4 calls in flight** (the host's
+budget; the server separately caps concurrent asset reads per app and answers
+`TOO_MANY_CONCURRENT_QUERIES` beyond it) — never `Promise.all` a whole level. To locate something by name, search the folder you expect it in (see above) — a root-level
 `keyword` will not find it deeper down.
 
 ## Hard rules

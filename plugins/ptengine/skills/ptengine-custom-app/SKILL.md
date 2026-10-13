@@ -58,10 +58,10 @@ upgrade to the newest version satisfying these floors, then `npm install`:
 
 | Package | Floor | Why |
 |---|---|---|
-| `@ptengine/app-sdk` | ≥ 2.4.0 | `context.user`; `requiredScope` values equal the manifest scopes (2.2.2+) |
-| `@ptengine/app-backend` | ≥ 0.4.0 | `ctx.auth.email` / `ctx.auth.name`; `ctx.vars` (0.2+) |
+| `@ptengine/app-sdk` | ≥ 2.8.0 | `asset:read` + `PtApp.asset.list/sharedWithMe/get` (2.8); `ai:invoke` (2.7); `asset:write` (2.6); `openapi:read` (2.5); `context.user` (2.4) — an older manifest schema rejects the newer scopes with `SCOPE_UNKNOWN` |
+| `@ptengine/app-backend` | ≥ 0.8.0 | `ctx.pt.asset.list/sharedWithMe/get` (0.8); `ctx.pt.ai.chat/stream` (0.7); `ctx.pt.asset.*` writes (0.6); `ctx.pt.openApiUrl` (0.5); `ctx.auth.email/name` (0.4); `ctx.vars` (0.2) |
 
-`0.x` caret ranges do not cross minors — `^0.2.0` never reaches 0.4; edit the range, then
+`0.x` caret ranges do not cross minors — `^0.4.0` never reaches 0.8; edit the range, then
 `npm install`. `npm run doctor` enforces the same floors (`PACKAGE_FLOORS` in the starter),
 so a stale project fails there with the exact `npm i` command to run. `npm run dev` runs vite + `wrangler dev` and signs real Ed25519 tokens, so expiry, `aud` mismatch and missing scopes surface locally; a light app runs the front end alone (see tracks).
 
