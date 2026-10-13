@@ -28,7 +28,11 @@ What the runtime guarantees, so you must not re-implement it:
 - **Undeclared routes 404** before authentication, so paths never leak by error shape.
 - **Errors become one envelope**: `{ error: { code, message, requestId } }`. Throw
   `ctx.error(status, code)` for a controlled response; anything else becomes a 500 whose
-  stack goes to the logs only.
+  stack goes to the logs only. `ctx.error`'s third argument (`detail`) is **logged, never
+  sent** — the client's `message` is just the `code`. For text the front end should show,
+  `throw badRequest(code, message)` (also `unauthorized` / `forbidden` / `notFound`, or
+  `new AppError(status, code, message)` for other statuses; all exported from
+  `@ptengine/app-backend`).
 - **A built-in probe at `/api/__health`** (unauthenticated, returns identity only) — the
   platform calls it after deploy and rolls back automatically if it fails. Declaring your
   own `/__health` route throws at startup.
@@ -55,7 +59,7 @@ What the runtime guarantees, so you must not re-implement it:
 | `ctx.pt.ai.*` | Call an LLM. Needs `ai:invoke` in `manifest.scopes` **and** an admin's approval. Two calls: `chat` (complete result) / `stream` (SSE `Response`) — see [Calling an LLM](#calling-an-llm-aiinvoke) |
 | `ctx.fetch(url, init)` | Outbound with a 10s default `timeoutMs` and structured logging; a caller-supplied `signal` still works. Whether a host is reachable is decided by the manifest's outbound allow-list, not by this call |
 | `ctx.secrets.X` / `ctx.vars.X` | Only names declared in the manifest resolve; anything else throws `SECRET_NOT_DECLARED` / `VAR_NOT_DECLARED` instead of yielding `undefined`. `PT_`-prefixed names are reserved and always refused. An empty string is a legitimate value. Secrets are references — a new value applies at once. Vars are baked into the worker at deploy time — after editing a var on the admin config page click **重新部署** (redeploy current version) to apply it; no new version upload is needed |
-| `ctx.requireScope(...)`, `ctx.error(status, code, detail)`, `ctx.log(msg, fields)`, `ctx.waitUntil(p)` | `detail` goes to logs only, never into the response. `ctx.log` emits one JSON line carrying `requestId` / `appId` / `versionId` / `route` / `userId` / `sid` |
+| `ctx.requireScope(...)`, `ctx.error(status, code, detail)`, `ctx.log(msg, fields)`, `ctx.waitUntil(p)` | `ctx.error` returns the error — `throw` it. `detail` goes to logs only, never into the response (client `message` = `code`); for a user-facing message use `badRequest(code, message)` & co. (above). `ctx.log` emits one JSON line carrying `requestId` / `appId` / `versionId` / `route` / `userId` / `sid` |
 
 **Use `ctx`, never `env`.** The production `env` is assembled by the platform and does not
 match your local `wrangler.jsonc`; `ctx` is the stable contract and enforces the boundaries.
