@@ -26,6 +26,14 @@ rules — `asset:write`, backend only, see `backend-runtime.md`.)
   yet. `studio.sources[].textContent` is **omitted unless** `include: ['sourceText']` (can be large).
 - Node types on a list: `folder page group image component font studio shortcut`; `insight` is not open.
 
+## Ids: read nodes vs. write calls
+
+**Which id is which.** The write calls (`create` / `update` / `uploadSource`) call the Studio
+entity's id `assetId`. On the read side that same value is the node's **`id`** — pass it straight
+to `get({ type: 'studio', id })`, and match it against `node.id` when looking for what you just
+wrote. The `assetId` field on a read node is a different id: the permission system's (pacl) asset
+id. Never compare a written `assetId` with a node's `assetId`.
+
 **Before writing asset code, read `node_modules/@ptengine/app-sdk/asset-read.llms.txt`** — the readable
 contract: every node type's fields, the four detail shapes, inputs, paging rules and error codes.
 `asset-read.schema.json` (same package) is the machine-readable source the TypeScript types are

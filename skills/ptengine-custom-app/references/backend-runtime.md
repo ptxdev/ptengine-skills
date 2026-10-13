@@ -236,6 +236,12 @@ const { sourceId } = await ctx.pt.asset.uploadSource({
 });
 ```
 
+**Which id is which.** The `assetId` these write calls return and take is the Studio entity's id.
+On the read side (`ctx.pt.asset.list / sharedWithMe / get`, see `assets.md`) that same value is the
+node's **`id`** — pass it straight to `get({ type: 'studio', id: assetId })`, and match `node.id`
+when looking for what you just wrote. A read node's own `assetId` field is a different id: the
+permission system's (pacl) asset id. Never compare a written `assetId` with a node's `assetId`.
+
 ### `content` is an envelope, and getting it wrong fails silently
 
 The server treats `content` as **opaque** — it validates `kind` against a registry and does not
@@ -291,7 +297,7 @@ product changes one. Let the call fail and surface the code.
 | 429 | Per-app write concurrency cap (2 in flight; reads have their own, separate budget of 6) |
 | `PT_ASSET_FAILED` | Anything else — the upstream message is passed through, check the app logs |
 
-### Three things that surprise people
+### Four things that surprise people
 
 1. **No `seedKey` parameter on `ensureFolder`.** The folder's stable identity is derived
    server-side from your authenticated `appId`, so an app can neither squat on the product's own
@@ -302,6 +308,9 @@ product changes one. Let the call fail and surface the code.
 3. **`update({ content })` replaces, never merges.** Changing only the body still means sending
    `name` along; otherwise the new document lacks `name` and stops being recognised as the
    envelope — back to the blank card.
+4. **A written `assetId` is a read node's `id`, not its `assetId`.** Looking up what you just
+   wrote via `list` by comparing `node.assetId === assetId` finds nothing — the node's `assetId`
+   is the pacl id. Compare `node.id`, or skip the listing and call `get({ type: 'studio', id: assetId })`.
 
 ### What the user sees, and when
 
