@@ -407,8 +407,9 @@ app.post('/ask', async ctx => ctx.pt.ai.stream({
 **Read `scripts/rules.json` in the project — the `aiModels` field.** That file is generated from
 the platform contract and kept in sync by CI, so it is the list that is actually enforced, not a
 copy in prose that drifts. `ptx doctor` also prints it for any app declaring `ai:invoke`, and
-warns if your backend references a model that is not on it, uses an old prefixed name, or uses a
-model that is only enabled in some environments (`aiModelsByEnv`).
+warns if your backend references a model that is not on it or uses an old prefixed name. It is
+the only list you need: which provider serves a model, and in which environment, is the
+platform's business.
 
 It spans Anthropic, OpenAI and Google. **Do not assume a model exists because Cloudflare's model
 catalogue lists it** — that page shows what AI Gateway knows about, not what this gateway is
@@ -432,7 +433,7 @@ can tell the difference.
 | `AI_BUDGET_EXCEEDED` | 429 | **The workspace's AI budget is spent.** Raise the limit or wait for the window — **retrying will not help** |
 | `AI_RATE_LIMITED` | 429 | Upstream throttling. This one *is* worth retrying |
 | `AI_MODEL_NOT_ALLOWED` | 400 | The model is not on the allow-list. **The error lists the allowed ones** |
-| `AI_MODEL_UNAVAILABLE` | 400 | The model exists but is not enabled in this environment. Pick one from `aiModels` (available everywhere) |
+| `AI_MODEL_UNAVAILABLE` | 400 | The model exists but is not enabled in this environment. Pick one from `aiModels` — every model there works in every environment |
 | `AI_UPSTREAM_FAILED` | 502 | Upstream's own failure; the message is passed through verbatim |
 
 **Never collapse those two 429s into one "please try again later".** One of them needs a human to
