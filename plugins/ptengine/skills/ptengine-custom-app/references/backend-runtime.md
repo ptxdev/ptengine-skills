@@ -370,7 +370,7 @@ those customers cannot install at all.
 ```ts
 // Complete result — the user waits for the whole generation.
 const res = await ctx.pt.ai.chat({
-    model: 'anthropic/claude-sonnet-5',          // provider prefix is REQUIRED
+    model: 'claude-sonnet-5',                    // logical name, NO vendor prefix
     messages: [{ role: 'user', content: 'Summarise last week in one paragraph.' }],
     max_tokens: 1024
 });
@@ -378,16 +378,19 @@ return { text: res.choices[0].message.content };
 
 // Streaming — return the Response straight from your route.
 app.post('/ask', async ctx => ctx.pt.ai.stream({
-    model: 'anthropic/claude-sonnet-5',
+    model: 'claude-sonnet-5',
     messages: [{ role: 'user', content: ctx.body.question }]
 }));
 ```
 
-1. **`model` must carry the provider prefix** (`anthropic/claude-sonnet-5`), and must be on the
-   allow-list. A bare name, a wildcard, or anything not on the list is rejected with
-   400 `AI_MODEL_NOT_ALLOWED` **and the error names every allowed model** — so you never have to
-   guess twice. The runtime does not add a prefix for you: guessing the provider is worse than
-   failing.
+1. **`model` is a logical name with no vendor prefix** (`claude-sonnet-5`), and must be on the
+   allow-list. Which provider and whose credentials serve it is decided by the platform gateway,
+   per environment — your app does not need to know, and the route can change without you
+   touching code. A misspelling, a wildcard, or anything not on the list is rejected with
+   400 `AI_MODEL_NOT_ALLOWED`; a known model that is not enabled in the current environment gets
+   400 `AI_MODEL_UNAVAILABLE`. **Both errors name every model available in that environment** —
+   so you never have to guess twice. Older prefixed names (`anthropic/claude-sonnet-5`) are still
+   accepted, but the prefix no longer chooses the route; write the logical name.
 2. **Do not `await res.text()` on the streaming `Response` and forward that.** It buffers the whole
    SSE stream and turns streaming into a single late response. Short answers look fine, so this
    only shows up on the long ones — exactly the ones streaming was for. Use
@@ -396,13 +399,16 @@ app.post('/ask', async ctx => ctx.pt.ai.stream({
    would `json()` an SSE stream and throw an unexplainable parse error.
 4. Everything except `stream` is passed through untouched (`temperature`, `tools`, …). There is no
    allow-list, so new upstream parameters work the day they ship.
+5. **The `model` field in the response is whatever the upstream returned** — it is not guaranteed
+   to equal the logical name you sent. Do not branch on it.
 
 ### Which models can I use?
 
 **Read `scripts/rules.json` in the project — the `aiModels` field.** That file is generated from
 the platform contract and kept in sync by CI, so it is the list that is actually enforced, not a
 copy in prose that drifts. `ptx doctor` also prints it for any app declaring `ai:invoke`, and
-warns if your backend references a model that is not on it.
+warns if your backend references a model that is not on it, uses an old prefixed name, or uses a
+model that is only enabled in some environments (`aiModelsByEnv`).
 
 It spans Anthropic, OpenAI and Google. **Do not assume a model exists because Cloudflare's model
 catalogue lists it** — that page shows what AI Gateway knows about, not what this gateway is
@@ -426,6 +432,7 @@ can tell the difference.
 | `AI_BUDGET_EXCEEDED` | 429 | **The workspace's AI budget is spent.** Raise the limit or wait for the window — **retrying will not help** |
 | `AI_RATE_LIMITED` | 429 | Upstream throttling. This one *is* worth retrying |
 | `AI_MODEL_NOT_ALLOWED` | 400 | The model is not on the allow-list. **The error lists the allowed ones** |
+| `AI_MODEL_UNAVAILABLE` | 400 | The model exists but is not enabled in this environment. Pick one from `aiModels` (available everywhere) |
 | `AI_UPSTREAM_FAILED` | 502 | Upstream's own failure; the message is passed through verbatim |
 
 **Never collapse those two 429s into one "please try again later".** One of them needs a human to
