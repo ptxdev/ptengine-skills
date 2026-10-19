@@ -100,7 +100,7 @@ so a stale project fails there with the exact `npm i` command to run. `npm run d
 (`confirm` returns a promise — await it) · `nav { push, syncRoute }` ·
 `data { query, describe }` · `asset { list, sharedWithMe, get }` (SDK ≥2.8.0) ·
 `heatmap { open, createLink }` (SDK ≥2.9.0; `open` only inside a click handler) — both absent on
-an older host, feature-detect · `auth { getAppToken }` (backend apps only) ·
+an older platform, feature-detect (an older host rejects heatmap calls with `PT_METHOD_NOT_ALLOWED`) · `auth { getAppToken }` (backend apps only) ·
 `ai { provideContext }` · `on(event, cb)` for exactly `'context'` / `'route'` /
 `'overlay.click'` — no other events, and no other host globals.
 

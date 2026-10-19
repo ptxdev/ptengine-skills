@@ -8,7 +8,15 @@ the product's heatmap list.
 | Step | Where | Needs |
 | --- | --- | --- |
 | List | `PtApp.data.query({ queryType: 'heatmap_page_list', … })` — also `ctx.pt.query('heatmap_page_list', …)` from a backend, same rows | `analytics:read` in `manifest.scopes` |
-| Open / link | `window.PtApp.heatmap.open / createLink` — **Bridge only** (`@ptengine/app-sdk` ≥ 2.9.0); there is no backend equivalent | `analytics:read` in `manifest.scopes`; feature-detect with `if (PtApp.heatmap)` — an older host has no `heatmap` |
+| Open / link | `window.PtApp.heatmap.open / createLink` — **Bridge only** (`@ptengine/app-sdk` ≥ 2.9.0); there is no backend equivalent | `analytics:read` in `manifest.scopes`; feature-detect with `if (PtApp.heatmap)` **and** handle `PT_METHOD_NOT_ALLOWED` (see below) |
+
+`analytics:read` is a data scope: declaring it is not enough, it must also be granted — see
+[`data-queries.md`](data-queries.md) for how data scope consent works and what `SCOPE_DENIED` means.
+
+**Feature detection:** `PtApp.heatmap` exists once the runtime SDK the platform injects into your
+app is ≥ 2.9.0 — it reflects that runtime SDK version, not whether the host page supports heatmaps.
+If the host is older than the runtime SDK, calling it rejects with `PT_METHOD_NOT_ALLOWED`; treat
+that as "heatmaps unavailable" (e.g. hide the button).
 
 ## The list: `heatmap_page_list`
 
@@ -42,7 +50,8 @@ exact params; never write them from memory.
 - `open({ url, dateRange?, deviceType? })` opens the overlay in a new tab once the host's popup
   succeeded, and resolves to the link. `createLink(input)` only generates the link (to put in a
   table, copy to the clipboard …).
-- Input: `url` — a `heatmap_page_list` row's `url`, or any page URL of this profile;
+- Input: `url` — a `heatmap_page_list` row's `url`, or any page URL of this profile (`http(s)` or
+  no scheme; any other scheme such as `javascript:` is rejected with `HEATMAP_INPUT_INVALID`);
   `dateRange?: { start, end }` as `YYYY-MM-DD` (default: the last 30 days including today, in the
   profile's time zone; the end date may not be after today); `deviceType?: 'PC' | 'MOBILE' | 'TABLET'`
   (default: picked from the page's traffic).
@@ -76,10 +85,11 @@ button.onclick = async () => {
 | `HEATMAP_INPUT_INVALID` | bad `url` / `dateRange` / `deviceType` (e.g. an end date after today) |
 | `HEATMAP_FAILED` | the platform could not create the heatmap link — retry later |
 | `PT_POPUP_BLOCKED` | `open` only: the browser blocked the new tab |
+| `PT_METHOD_NOT_ALLOWED` | the host is older than the SDK and has no heatmap support |
 
-The list is not exhaustive: keep a generic fallback branch for anything else, including the
-bridge's own `PT_*` errors. Like `data.query`, heatmap calls have **no client-side timeout** — show
-a loading state.
+The list is not exhaustive: you may also see `UNAUTHORIZED`, `SID_REQUIRED`, `INTERNAL_ERROR` and
+the bridge's other `PT_*` errors — always keep a generic fallback branch. Like `data.query`, heatmap
+calls have **no client-side timeout** — show a loading state.
 
 ## Hard rules
 
@@ -88,8 +98,8 @@ a loading state.
    or anything else between the click and `open`.
 2. **On `PT_POPUP_BLOCKED`, fall back to `createLink`** and show the link for the user to click —
    never retry `open` in a loop.
-3. **Don't offer an open action on `locked` rows** — show them as locked (the product greys them
-   out); opening one fails with `HEATMAP_NOT_ALLOWED`.
+3. **Don't offer an open action on `locked` rows** — show them as locked; opening one fails with
+   `HEATMAP_NOT_ALLOWED`.
 4. **The link only works for signed-in members of the workspace.** Don't present it as a shareable
    public link, and don't send it to people outside the workspace.
 5. List pages with `heatmap_page_list` — don't rebuild the list from `page_insight`: that misses the
