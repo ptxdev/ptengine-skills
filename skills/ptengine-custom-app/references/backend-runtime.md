@@ -450,7 +450,7 @@ rolls over, with no idea what happened.
 | Outbound call hangs and then fails | The host is not in the manifest's outbound allow-list; an omitted or empty list means no outbound at all. Platform-owned and loopback hosts are always refused |
 | D1 `too many SQL variables` | More than 100 bind parameters in one statement — batch ids at ~90, one statement per batch |
 | A user sees another site's or workspace's rows | A query, KV key or R2 key missing `ctx.workspaceId` and/or `ctx.auth.sid` |
-| Scheduled work never runs | Cron is silently dropped; there is no scheduler |
+| Scheduled work never runs | Worker cron is silently dropped — declare `backend.jobs` and let users subscribe ([`scheduled-jobs.md`](scheduled-jobs.md)) |
 | A 500 whose body carries only a `requestId` | An unexpected throw. There is **no log console for app authors** — the stack and your `ctx.log` lines are reachable platform-side by that `requestId` only, so surface it in the UI and log breadcrumbs at every decision point |
 
 ## Not available (don't design around them)
@@ -458,4 +458,5 @@ rolls over, with no idea what happened.
 Durable Objects, raw TCP `connect()`, `caches.default`, `request.cf`, mTLS client
 certificates, Queues, Workflows, and **Cron Triggers / `scheduled()`** — cron config is
 **silently dropped** at deploy time: no error, no warning, and the job simply never runs.
-There is no scheduling primitive yet, so anything periodic must be triggered by a request.
+Periodic work goes through the platform scheduler instead: declare `backend.jobs` in the
+manifest and let users subscribe — see [`scheduled-jobs.md`](scheduled-jobs.md).
