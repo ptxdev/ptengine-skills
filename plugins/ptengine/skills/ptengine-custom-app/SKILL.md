@@ -23,7 +23,7 @@ reading another's rows) — follow the rules instead of iterating on symptoms.
 | Assets | Browse / read the user's Drive assets, `PtApp.asset.*` | `ctx.pt.asset.list/get/sharedWithMe` server-side — see [`references/assets.md`](references/assets.md) |
 | Storage | None, or per-browser `localStorage` | D1 / KV — state shared across users, sessions and devices |
 | Credentials | None (the bundle is publicly fetchable) | Third-party credentials held server-side + a declared outbound host allow-list |
-| Compute | Whatever the browser can do while the user waits | Large result sets, post-processing, background work via `ctx.waitUntil` |
+| Compute | Whatever the browser can do while the user waits | Large result sets, post-processing, background work via `ctx.waitUntil`; scheduled runs + channel notifications via `backend.jobs` ([`references/scheduled-jobs.md`](references/scheduled-jobs.md)) |
 | Permissions | Bridge-usable scopes such as `asset:read` / `ui:notify`; never backend-only ones (`openapi:read`, `asset:write`, `ai:invoke`) | Needs `user:read` or similar, so consent and its incremental-approval design matter |
 
 When unsure, **build the light app first** — faster to ship and impossible to leak tenant
@@ -58,8 +58,8 @@ upgrade to the newest version satisfying these floors, then `npm install`:
 
 | Package | Floor | Why |
 |---|---|---|
-| `@ptengine/app-sdk` | ≥ 2.8.0 | `asset:read` + `PtApp.asset.list/sharedWithMe/get` (2.8); `ai:invoke` (2.7); `asset:write` (2.6); `openapi:read` (2.5); `context.user` (2.4) — an older manifest schema rejects the newer scopes with `SCOPE_UNKNOWN` |
-| `@ptengine/app-backend` | ≥ 0.8.0 | `ctx.pt.asset.list/sharedWithMe/get` (0.8); `ctx.pt.ai.chat/stream` (0.7); `ctx.pt.asset.*` writes (0.6); `ctx.pt.openApiUrl` (0.5); `ctx.auth.email/name` (0.4); `ctx.vars` (0.2) |
+| `@ptengine/app-sdk` | ≥ 2.8.0 (scheduled jobs: ≥ 2.10.0) | `jobs:run` / `notify:send`, `backend.jobs`, `PtApp.subscriptions.open` (2.10); `asset:read` + `PtApp.asset.list/sharedWithMe/get` (2.8); `ai:invoke` (2.7); `asset:write` (2.6); `openapi:read` (2.5); `context.user` (2.4) — an older manifest schema rejects the newer scopes with `SCOPE_UNKNOWN` |
+| `@ptengine/app-backend` | ≥ 0.8.0 (scheduled jobs: ≥ 0.9.0) | `ctx.pt.jobs.*` / `ctx.pt.notify.send` / `ctx.requireTrigger` (0.9); `ctx.pt.asset.list/sharedWithMe/get` (0.8); `ctx.pt.ai.chat/stream` (0.7); `ctx.pt.asset.*` writes (0.6); `ctx.pt.openApiUrl` (0.5); `ctx.auth.email/name` (0.4); `ctx.vars` (0.2) |
 
 `0.x` caret ranges do not cross minors — `^0.4.0` never reaches 0.8; edit the range, then
 `npm install`. `npm run doctor` enforces the same floors (`PACKAGE_FLOORS` in the starter),
@@ -97,7 +97,7 @@ so a stale project fails there with the exact `npm i` command to run. `npm run d
 
 `context { appId, sid, locale, theme, initialPath, user? }` · `ui { toast, confirm, overlay }`
 (`confirm` returns a promise — await it) · `nav { push, syncRoute }` ·
-`data { query, describe }` · `auth { getAppToken }` (backend apps only) ·
+`data { query, describe }` · `auth { getAppToken }` (backend apps only) · `subscriptions?.open` (`jobs:run`; optional — capability-detect) ·
 `ai { provideContext }` · `on(event, cb)` for exactly `'context'` / `'route'` /
 `'overlay.click'` — no other events, and no other host globals.
 
@@ -131,9 +131,9 @@ Capability table, tenancy rules, local `.dev.vars` setup and proven patterns:
 `export default createApp<ApiRoutes>({ routes, publicRoutes })`: every route is authenticated
 unless its exact key is listed in `publicRoutes` (no wildcards, and no `ctx.auth` there).
 
-`ctx` is the whole surface (`auth` · `workspaceId` · `db` · `kv` · `pt.query` / `pt.asset` / `pt.ai` · `fetch`
+`ctx` is the whole surface (`auth` · `workspaceId` · `db` · `kv` · `pt.query` / `pt.asset` / `pt.ai` / `pt.jobs` / `pt.notify` · `fetch`
 · `secrets`/`vars` · `requireScope` · `error` · `log` …) — the field-by-field table, what is **not**
-available (Durable Objects, Queues, Cron Triggers, `connect()`, `request.cf`) and the vars-need-「重新部署」
+available (Durable Objects, Queues, Cron Triggers — use `backend.jobs`, `connect()`, `request.cf`) and the vars-need-「重新部署」
 / secrets-apply-at-once rule are in `backend-runtime.md`. Non-negotiables: **never touch `env`
 directly, use `ctx`**; never fork `@ptengine/app-backend`; partition every read and write by
 `ctx.workspaceId` *and* `ctx.auth.sid`; keep API changes backward-compatible for one release
@@ -185,7 +185,7 @@ component/variant names from its `llms.txt`, never from memory. Keep the starter
 ## Manifest
 
 - `version` belongs to the app and **must increase on every upload** (`package.json` version is ignored). `schemaVersion`: `1` = front end only, `2` = may carry `backend`.
-- `scopes`: `analytics:read`, `profile:read`, `user:read`, `ui:notify`, `openapi:read`, `asset:read`, `asset:write`, `ai:invoke` — nothing else validates. Data scopes decide whether the backend gets a data gateway at all and drive the admin consent dialog: declare the minimum, ask for more in a later version.
+- `scopes`: `analytics:read`, `profile:read`, `user:read`, `ui:notify`, `openapi:read`, `asset:read`, `asset:write`, `ai:invoke`, `jobs:run`, `notify:send` (the last two: scheduled jobs and channel notifications, write-class, [`references/scheduled-jobs.md`](references/scheduled-jobs.md)) — nothing else validates. Data scopes decide whether the backend gets a data gateway at all and drive the admin consent dialog: declare the minimum, ask for more in a later version.
   `openapi:read` = call the Open API from the backend with a profile API key; per-app key → single-workspace apps only. `asset:read` = read the user's Drive assets, bridge or backend (`references/assets.md`; needs `@ptengine/app-sdk` ≥ 2.8.0 / `@ptengine/app-backend` ≥ 0.8.0). `asset:write` = write into the workspace asset library (`ctx.pt.asset.ensureFolder/create/update/uploadSource`); `ai:invoke` = call an LLM (`ctx.pt.ai.*`, credentials stay platform-side). Those two are **backend track only** and have **no first-party exemption** — an admin must approve each once, even for an app you uploaded yourself; `ai:invoke` is in that group because it **costs money** (platform fronts the bill, metered per workspace) — and it is a **paid capability that follows the workspace's plan**, so declaring it is not enough and you cannot move that part: never make AI the only path through your app.
   ⚠️ `ai:invoke` is **unrelated to the manifest's `ai` block** (that one integrates the right-hand AI assistant). `openapi:read` / `asset:write` / `ai:invoke`: `backend-runtime.md`; consent semantics: `publish-and-operate.md`.
 - `backend` (entry under `_backend/`, `routes` exactly `["/api/*"]`, resources, migrations,
