@@ -156,10 +156,10 @@ data. Reading Drive assets (folders, pages, Studio …) is separate: [`reference
 
 ## UI
 
-Use `@ptengine/design-components` exclusively (no antd/MUI/chakra, no hand-rolled controls);
-take component/variant names from its `llms.txt`, never from memory. Keep the starter's four
-wirings intact (Tailwind preset, `content` glob into the package `dist`, `tokens.css` import,
-`pt-ui` class on `<html>`). Semantic classes only, never hardcoded colors; `className` is layout-only.
+**Before any UI work read [`references/design.md`](references/design.md)** (product/interaction rules).
+Use `@ptengine/design-components` only (no antd/MUI/chakra, no hand-rolled controls); take
+component/variant names from its `llms.txt`, never from memory. Keep the starter's four wirings
+(Tailwind preset, `content` glob into the package `dist`, `tokens.css`, `pt-ui` on `<html>`) intact.
 
 ## Diagnosis: symptom → likely cause
 
