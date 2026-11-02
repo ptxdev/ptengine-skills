@@ -1,8 +1,7 @@
 # Scheduled jobs and channel notifications (`jobs:run` / `notify:send`)
 
-> **Pre-release.** Available on the dev / staging platforms only, with `@ptengine/app-backend`
-> ≥ 0.9.0-rc.1 and `@ptengine/app-sdk` ≥ 2.10.0-rc.1 (npm dist-tag `next`) — starter tag
-> `next-3.8.0-rc.1`. On older packages the types are missing and the calls don't exist.
+> Requires `@ptengine/app-backend` ≥ 0.9.0 and `@ptengine/app-sdk` ≥ 2.10.0 (starter v3.8.0 or later).
+> On older packages the types are missing and the calls don't exist.
 > The starter's `AGENTS.md` (section 「定时任务（backend.jobs）」) is the authoritative,
 > field-by-field version of this page.
 

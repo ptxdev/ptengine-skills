@@ -49,7 +49,7 @@ git clone --branch "$TAG" --depth 1 https://github.com/ptxdev/ptengine-app-start
 cd my-app && rm -rf .git && npm install && npm run doctor && npm run dev
 ```
 
-Always take the newest `v3.*` tag (the command above resolves it; never hard-code one). **Pre-release:** scheduled jobs (`backend.jobs`) are on dev/staging platforms only — use starter tag `next-3.8.0-rc.1` there.
+Always take the newest `v3.*` tag (the command above resolves it; never hard-code one).
 
 **Version check before any work on an existing project** — this doc describes the current
 contract; an older installed package will contradict it (e.g. `requiredScope: "query:read"`
@@ -58,8 +58,8 @@ upgrade to the newest version satisfying these floors, then `npm install`:
 
 | Package | Floor | Why |
 |---|---|---|
-| `@ptengine/app-sdk` | ≥ 2.8.0 (scheduled jobs: ≥ 2.10.0-rc.1, npm `next`) | `jobs:run` / `notify:send`, `backend.jobs`, `PtApp.subscriptions.open` (2.10); `asset:read` + `PtApp.asset.list/sharedWithMe/get` (2.8); `ai:invoke` (2.7); `asset:write` (2.6); `openapi:read` (2.5); `context.user` (2.4) — an older manifest schema rejects the newer scopes with `SCOPE_UNKNOWN` |
-| `@ptengine/app-backend` | ≥ 0.8.0 (scheduled jobs: ≥ 0.9.0-rc.1, npm `next`) | `ctx.pt.jobs.*` / `ctx.pt.notify.send` / `ctx.requireTrigger` (0.9); `ctx.pt.asset.list/sharedWithMe/get` (0.8); `ctx.pt.ai.chat/stream` (0.7); `ctx.pt.asset.*` writes (0.6); `ctx.pt.openApiUrl` (0.5); `ctx.auth.email/name` (0.4); `ctx.vars` (0.2) |
+| `@ptengine/app-sdk` | ≥ 2.8.0 (scheduled jobs: ≥ 2.10.0) | `jobs:run` / `notify:send`, `backend.jobs`, `PtApp.subscriptions.open` (2.10); `asset:read` + `PtApp.asset.list/sharedWithMe/get` (2.8); `ai:invoke` (2.7); `asset:write` (2.6); `openapi:read` (2.5); `context.user` (2.4) — an older manifest schema rejects the newer scopes with `SCOPE_UNKNOWN` |
+| `@ptengine/app-backend` | ≥ 0.8.0 (scheduled jobs: ≥ 0.9.0) | `ctx.pt.jobs.*` / `ctx.pt.notify.send` / `ctx.requireTrigger` (0.9); `ctx.pt.asset.list/sharedWithMe/get` (0.8); `ctx.pt.ai.chat/stream` (0.7); `ctx.pt.asset.*` writes (0.6); `ctx.pt.openApiUrl` (0.5); `ctx.auth.email/name` (0.4); `ctx.vars` (0.2) |
 
 `0.x` caret ranges do not cross minors — `^0.4.0` never reaches 0.8; edit the range, then
 `npm install`. `npm run doctor` enforces the same floors (`PACKAGE_FLOORS` in the starter),
