@@ -164,16 +164,19 @@ are never taken from the payload; the host / gateway injects them.
 - Image URLs are **public**: anyone holding one can download it, no credentials (safety comes from the
   unguessable `captureId` in the path). Don't log them anywhere public; they expire after ~90 days —
   store the image yourself if you need it longer.
-- Submitting the **same parameters again** returns the **same `captureId`** while that task is still
-  in flight (`queued` / `running`) or cached: a succeeded capture is served from cache (`cached: true`)
+- Submitting the **same parameters again from the same app** returns the **same `captureId`** while
+  that task is still in flight (`queued` / `running`) or cached (another app in the workspace gets its own task): a succeeded capture is served from cache (`cached: true`)
   for 24 h when the range ends before today, 1 h when it includes today. After a failure, or once the
   cache has expired, the same call creates a new task with a new `captureId` (and an omitted
   `dateRange` resolves to a different range on a different day).
+- `attentionBlockMap` block labels (durations like "1m 5s") are rendered in the language of whoever
+  triggered the render; a later call within the cache window gets the cached image, i.e. **the first
+  caller's language**.
 
 ### Polling
 
 The SDKs don't poll for you. **First check 10 s after submitting, then every 5 s.** A capture can
-take up to **~6 minutes**; one still `queued` / `running` after 10 minutes is failed by the platform
+take up to **~6 minutes**; one still `queued` after 30 minutes, or `running` for over 15 minutes, is failed by the platform
 with `HEATMAP_CAPTURE_TIMEOUT`, so a loop that follows this cadence always ends.
 
 ```ts
@@ -181,7 +184,7 @@ import type { PtAppHeatmapCapture } from '@ptengine/app-sdk';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-// No client deadline needed: the platform fails a task still queued / running after 10 minutes.
+// No client deadline needed: the platform fails a task queued over 30 minutes or running over 15 minutes.
 async function waitForCapture(cap: PtAppHeatmapCapture): Promise<PtAppHeatmapCapture> {
   const hm = window.PtApp.heatmap;
   if (cap.status === 'succeeded' || cap.status === 'failed') return cap;   // cache hit
@@ -310,7 +313,7 @@ Capture what you will show, not every type "just in case".
 | --- | --- | --- |
 | `TIMEOUT` | the renderer timed out on this page | **Yes** |
 | `RATE_LIMITED` | the renderer is rate-limited right now | **Yes**, a bit later |
-| `HEATMAP_CAPTURE_TIMEOUT` | the task didn't finish within 10 minutes | **Yes** |
+| `HEATMAP_CAPTURE_TIMEOUT` | the task stayed queued over 30 minutes or running over 15 minutes | **Yes** |
 | `PAGE_NOT_ACCESSIBLE` | the renderer could not open the page | No |
 | `CONTENT_ERROR` | the renderer hit an error with the page's content | No |
 | `HEATMAP_NO_DATA` | no visits for this page / device / date range | No — change range / device |
