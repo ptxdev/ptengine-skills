@@ -72,6 +72,8 @@ calls your backend instead, on the schedule a **user** picked.
   **"Also save to my assets"**, each successful run lands in their asset library — no code needed.
 - A failed run (5xx / timeout) is retried up to 4 attempts in total; a 4xx is not retried. Five failed runs in a
   row pause the job.
+- Heatmap images in a job (`ctx.pt.heatmap.capture`; finish a slow capture in the next run; ≤ 12 new images per run):
+  [`heatmap.md`](heatmap.md#in-a-scheduled-job-finish-in-the-next-run-if-needed).
 
 ## 3. Preview
 
