@@ -99,7 +99,7 @@ so a stale project fails there with the exact `npm i` command to run. `npm run d
 `context { appId, sid, locale, theme, initialPath, user? }` · `ui { toast, confirm, overlay }`
 (`confirm` returns a promise — await it) · `nav { push, syncRoute }` ·
 `data { query, describe }` · `asset { list, sharedWithMe, get }` (SDK ≥2.8.0) · `heatmap { open, createLink, capture, getCapture }` (SDK ≥2.9.0, capture ≥2.11.0;
-`open` only inside a click handler) — both absent on an older platform, feature-detect (an older host rejects heatmap calls with `PT_METHOD_NOT_ALLOWED`) ·
+`open` only inside a click handler) — `asset` / `heatmap` methods are absent on an older runtime SDK, feature-detect each (`capture`/`getCapture` need app-sdk ≥2.11 / app-backend ≥0.10; an older host rejects heatmap calls with `PT_METHOD_NOT_ALLOWED`) ·
 `auth { getAppToken }` (backend apps only) · `subscriptions?.open` (`jobs:run`; optional — capability-detect) ·
 `ai { provideContext }` · `on(event, cb)` for exactly `'context'` / `'route'` /
 `'overlay.click'` — no other events, and no other host globals.

@@ -164,9 +164,11 @@ are never taken from the payload; the host / gateway injects them.
 - Image URLs are **public**: anyone holding one can download it, no credentials (safety comes from the
   unguessable `captureId` in the path). Don't log them anywhere public; they expire after ~90 days —
   store the image yourself if you need it longer.
-- Submitting the **same parameters again** (concurrently or later) returns the **same `captureId`**;
-  a recent identical capture is served from cache (`cached: true`) — for 24 h when the range ends
-  before today, 1 h when it includes today.
+- Submitting the **same parameters again** returns the **same `captureId`** while that task is still
+  in flight (`queued` / `running`) or cached: a succeeded capture is served from cache (`cached: true`)
+  for 24 h when the range ends before today, 1 h when it includes today. After a failure, or once the
+  cache has expired, the same call creates a new task with a new `captureId` (and an omitted
+  `dateRange` resolves to a different range on a different day).
 
 ### Polling
 
@@ -179,6 +181,7 @@ import type { PtAppHeatmapCapture } from '@ptengine/app-sdk';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+// No client deadline needed: the platform fails a task still queued / running after 10 minutes.
 async function waitForCapture(cap: PtAppHeatmapCapture): Promise<PtAppHeatmapCapture> {
   const hm = window.PtApp.heatmap;
   if (cap.status === 'succeeded' || cap.status === 'failed') return cap;   // cache hit
@@ -216,7 +219,8 @@ the platform.
 
 One run has a 300 s budget. Most captures finish inside it; when one doesn't, **store its
 `captureId` and pick it up with `getCapture` in the next run** instead of submitting again
-(resubmitting would dedupe to the same task too, but costs another gateway slot). Two runs of a
+(while it is still in flight, resubmitting would dedupe to the same task too, but costs another
+gateway slot). Two runs of a
 tenant job are at least an hour apart, so by then the capture has finished or failed.
 
 ```ts
@@ -225,8 +229,9 @@ tenant job are at least an hour apart, so by then the capture has finished or fa
   const key = `hm-pending:${ctx.workspaceId}:${ctx.auth.sid}:${ctx.auth.jobId}`;   // needs resources.kv
   const started = Date.now();   // `sleep` and `report` (build + send the message) are yours
 
-  // 1) a capture left over from the previous run
-  const pendingId = await ctx.kv.get(key);
+  // 1) a capture left over from the previous run — never in a preview: a preview must not consume
+  //    (send + delete) what the next real run is going to deliver (scheduled-jobs.md §3)
+  const pendingId = ctx.auth.preview ? null : await ctx.kv.get(key);
   if (pendingId) {
     const prev = await ctx.pt.heatmap.getCapture(pendingId).catch(() => null);  // NOT_FOUND etc. → drop it
     if (prev?.status === 'succeeded') await report(ctx, prev);
@@ -247,8 +252,9 @@ tenant job are at least an hour apart, so by then the capture has finished or fa
 };
 ```
 
-Delivery is at-least-once: a retried run that submits the same parameters gets the same
-`captureId` back — no duplicate task, no duplicate quota.
+Delivery is at-least-once: a retried run that submits the same parameters while the first
+attempt's capture is still in flight or cached gets the same `captureId` back — no duplicate task,
+no duplicate quota.
 
 ### Using `parts` in messages and emails
 
@@ -256,9 +262,11 @@ Delivery is at-least-once: a retried run that submits the same parameters gets t
 tens of thousands of pixels tall, which chat clients and mail clients shrink to unreadable or cut
 off. **For anything sent out, use `parts`**: one image per segment, top to bottom.
 
-- **Channel messages** (`ctx.pt.notify.send`): `imageUrl` accepts **only** `ctx.pt.render.chart` URLs, so a
-  heatmap image URL is rejected there. Put the URLs into `text` (e.g. the first part — the first
-  screen — plus a link to the rest), and use `link` to bring the reader back into your app.
+- **Channel messages** (`ctx.pt.notify.send`): `imageUrl` also accepts heatmap image URLs captured by
+  **this app in this workspace** (requires the platform release that ships `heatmap.capture`; before
+  that only `ctx.pt.render.chart` URLs pass). It takes **one** image: use `parts[0].url` (the first
+  screen), or `full.url` when the page is short (a single part); put links to the remaining parts in
+  `text`, and use `link` to bring the reader back into your app.
 - **Archives / reports** (the job's returned `archive.markdown`, or your own HTML email sent through a
   declared outbound host): embed the parts in order, one image per line
   (`![clickMap 1/3](parts[0].url)` …) so the page reads top to bottom.
