@@ -65,6 +65,9 @@ validate the question with `Run-Query`, then port the params. The companion skil
    cross-session trails). Use them only when the question is about one person; operator
    dashboards use the aggregate types. Person-level rows are also the clearest reason to
    move a query to the backend.
+8. **Heatmap page lists use `heatmap_page_list`** — never assemble one from `page_insight`:
+   only the dedicated queryType carries the product's ranking and the free-plan heatmap quota
+   (`locked` rows, `metadata.quotaLimited`). Opening a heatmap: [`heatmap.md`](heatmap.md).
 
 ## Normalizing two sources into one shape
 

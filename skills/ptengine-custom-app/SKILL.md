@@ -21,6 +21,7 @@ reading another's rows) — follow the rules instead of iterating on symptoms.
 | --- | --- | --- |
 | Data | Platform data through the bridge, `PtApp.data.query` | `ctx.pt.query` server-side, and/or merged with third-party or your own data |
 | Assets | Browse / read the user's Drive assets, `PtApp.asset.*` | `ctx.pt.asset.list/get/sharedWithMe` server-side — see [`references/assets.md`](references/assets.md) |
+| Heatmaps | List pages with `heatmap_page_list`, open / link with `PtApp.heatmap.*` — see [`references/heatmap.md`](references/heatmap.md) | Same list via `ctx.pt.query`; opening stays in the front end (bridge only) |
 | Storage | None, or per-browser `localStorage` | D1 / KV — state shared across users, sessions and devices |
 | Credentials | None (the bundle is publicly fetchable) | Third-party credentials held server-side + a declared outbound host allow-list |
 | Compute | Whatever the browser can do while the user waits | Large result sets, post-processing, background work via `ctx.waitUntil`; scheduled runs + channel notifications via `backend.jobs` ([`references/scheduled-jobs.md`](references/scheduled-jobs.md)) |
@@ -58,7 +59,7 @@ upgrade to the newest version satisfying these floors, then `npm install`:
 
 | Package | Floor | Why |
 |---|---|---|
-| `@ptengine/app-sdk` | ≥ 2.8.0 (scheduled jobs: ≥ 2.10.0) | `jobs:run` / `notify:send`, `backend.jobs`, `PtApp.subscriptions.open` (2.10); `asset:read` + `PtApp.asset.list/sharedWithMe/get` (2.8); `ai:invoke` (2.7); `asset:write` (2.6); `openapi:read` (2.5); `context.user` (2.4) — an older manifest schema rejects the newer scopes with `SCOPE_UNKNOWN` |
+| `@ptengine/app-sdk` | ≥ 2.8.0 (heatmaps: ≥ 2.9.0; scheduled jobs: ≥ 2.10.0) | `jobs:run` / `notify:send`, `backend.jobs`, `PtApp.subscriptions.open` (2.10); `PtApp.heatmap.open/createLink` + `heatmap_page_list` types (2.9); `asset:read` + `PtApp.asset.list/sharedWithMe/get` (2.8); `ai:invoke` (2.7); `asset:write` (2.6); `openapi:read` (2.5); `context.user` (2.4) — an older manifest schema rejects the newer scopes with `SCOPE_UNKNOWN` |
 | `@ptengine/app-backend` | ≥ 0.8.0 (scheduled jobs: ≥ 0.9.0) | `ctx.pt.jobs.*` / `ctx.pt.notify.send` / `ctx.requireTrigger` (0.9); `ctx.pt.asset.list/sharedWithMe/get` (0.8); `ctx.pt.ai.chat/stream` (0.7); `ctx.pt.asset.*` writes (0.6); `ctx.pt.openApiUrl` (0.5); `ctx.auth.email/name` (0.4); `ctx.vars` (0.2) |
 
 `0.x` caret ranges do not cross minors — `^0.4.0` never reaches 0.8; edit the range, then
@@ -97,7 +98,9 @@ so a stale project fails there with the exact `npm i` command to run. `npm run d
 
 `context { appId, sid, locale, theme, initialPath, user? }` · `ui { toast, confirm, overlay }`
 (`confirm` returns a promise — await it) · `nav { push, syncRoute }` ·
-`data { query, describe }` · `auth { getAppToken }` (backend apps only) · `subscriptions?.open` (`jobs:run`; optional — capability-detect) ·
+`data { query, describe }` · `asset { list, sharedWithMe, get }` (SDK ≥2.8.0) · `heatmap { open, createLink }` (SDK ≥2.9.0;
+`open` only inside a click handler) — both absent on an older platform, feature-detect (an older host rejects heatmap calls with `PT_METHOD_NOT_ALLOWED`) ·
+`auth { getAppToken }` (backend apps only) · `subscriptions?.open` (`jobs:run`; optional — capability-detect) ·
 `ai { provideContext }` · `on(event, cb)` for exactly `'context'` / `'route'` /
 `'overlay.click'` — no other events, and no other host globals.
 
