@@ -36,13 +36,12 @@ data from. Both tracks and the 1 → 2 upgrade path: [`references/tracks.md`](re
    `web/` + `backend/` + `shared/api.ts` (shared types are the single source of truth).
 2. **Read `AGENTS.md` in the scaffolded project** (explicit action: open and read it) —
    the authoritative build guide; this skill is the operating summary, and generated files
-   inside `@ptengine/app-sdk` outrank both.
+   inside `@ptengine/app-sdk` outrank both. Its **"自检规则（写代码前先看）" section** lists the 23 self-check rules (security / AI cost / efficiency / design) that `npm run audit` enforces later — write to them from the start.
 3. Settle the track above before writing code — it decides `schemaVersion`, the manifest
    shape and the whole publish flow ([`references/tracks.md`](references/tracks.md)).
 4. Reads Ptengine data → **set up the Ptengine MCP server first** and validate every query there;
    reads assets → read `@ptengine/app-sdk`'s `asset-read.llms.txt`; before UI → `@ptengine/design-components`' `llms.txt`.
-5. Build, keeping the invariants below intact. Then **`npm run doctor`, build, package**, and
-   hand the zip to the admin flow ([`references/publish-and-operate.md`](references/publish-and-operate.md)).
+5. Build, keeping the invariants below intact. Then **`npm run doctor`, `npm run audit`, build, package**, and hand the zip to the admin flow ([`references/publish-and-operate.md`](references/publish-and-operate.md)).
 
 ```bash
 TAG=$(git ls-remote --tags --refs https://github.com/ptxdev/ptengine-app-starter.git 'v3.*' | awk -F/ '{print $NF}' | sort -V | tail -1)
@@ -180,9 +179,10 @@ component/variant names from its `llms.txt`, never from memory. Keep the starter
 ## Before you claim it works
 
 1. `npm run doctor` — the conventions above, as an executable check.
-2. `npm run build`, then **`npm run package`**: only packaging validates zip structure,
+2. **`npm run audit`** (starter v3.10.0+) — the platform's 23 self-check rules, run locally. Exit code **2 = a severe finding, fix it before packaging**; 1 = normal findings only, list them and let the user decide; 3 = it did not run. Nothing outside App Builder gates a publish on these, so this is the only check a locally built app gets — details, the review rubric, CI and old projects: [`references/self-check.md`](references/self-check.md).
+3. `npm run build`, then **`npm run package`**: only packaging validates zip structure,
    manifest self-consistency, backend entry and migration numbering. Confirm its success line.
-3. **Behavioral check on the real platform** via the local dev entry: real `context` values, one
+4. **Behavioral check on the real platform** via the local dev entry: real `context` values, one
    `data.query` with rows, and — with a backend — a 200 from a real App Token call. If you cannot run it, say so.
 
 ## Manifest

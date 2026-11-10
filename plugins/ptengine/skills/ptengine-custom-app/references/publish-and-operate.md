@@ -209,6 +209,12 @@ management page, shown once, revocable) plus the app id, both supplied through
 CI variables. Never commit that credential or put an account-level one in CI —
 any dependency in the job can read it, and `ptx doctor` flags a committed one.
 
+Run **`npm run audit`** in the same job, before `ptx deploy`, and fail the job on exit code
+**2** (a severe finding; strict teams fail on 1 too). The platform's publish gate only applies
+to apps built inside App Builder — a zip uploaded from CI or by hand is not checked — so this
+is where a locally built app gets its gate. `npm run -s audit -- --json` gives a machine-readable
+report if you want to attach it to the pipeline.
+
 ## Status lifecycle and rollback
 
 `draft ⇄ published ⇄ paused` (no `draft ⇄ paused` edge):

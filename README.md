@@ -17,6 +17,7 @@ they are crossed.
 | --- | --- |
 | `ptengine-mcp-analytics` | Query Ptengine analytics through the Ptengine MCP server — visits, events, funnels, user paths, experiments, landing pages, and individual users — and parse the results. |
 | `ptengine-custom-app` | Build, debug, package, and publish a Ptengine Custom App: a static bundle that runs inside the platform and talks to it through `window.PtApp` (context, ui, nav, data.query, auth), optionally shipped with its own backend (a Worker serving `/api/*`, with a database, KV, server-side queries and platform-managed configuration). Covers the silent-failure pitfalls, the MCP↔App-SDK porting rules, multi-tenant invariants, the platform-assigned app address, and the platform-side publish flow. |
+| `custom-app-review` | Review a Custom App built outside App Builder (a repo or a zip) the way the platform's self-check does: run the starter's 23 deterministic `ptx audit` rules, apply the review rubric by hand, and hand back a severity-ranked report (security, AI cost, efficiency, design) before publishing. |
 
 ## Quick Start
 
@@ -41,6 +42,7 @@ name (it is the skill's id and must match `name:` in `SKILL.md`):
 ```bash
 cp -R skills/ptengine-mcp-analytics ~/.claude/skills/
 cp -R skills/ptengine-custom-app ~/.claude/skills/
+cp -R skills/custom-app-review ~/.claude/skills/
 ```
 
 ## Prerequisites
