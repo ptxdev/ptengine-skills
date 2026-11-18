@@ -280,7 +280,7 @@ generic branch.
 | `ins.error.code` | Meaning | Retry? |
 | --- | --- | --- |
 | `INSPECT_BROWSER_UNAVAILABLE` | no inspection browser available right now | **Yes**, a bit later |
-| `INSPECT_TIMEOUT` | over the hard time limit, or stuck in the queue | **Yes**, a bit later — when it was caused by queueing / the platform being busy. A page that logs an extremely large amount can also time out; retrying the same page won't help then — narrow it down with `filter` |
+| `INSPECT_TIMEOUT` | over the hard time limit, or stuck in the queue | **Yes**, a bit later — when it was caused by queueing / the platform being busy |
 | `INSPECT_PAGE_UNREACHABLE` | DNS / connection failure — no response for the main document | No — report it as "the page could not be reached" |
 | `INSPECT_FAILED` | anything else | No |
 | `INSPECT_UNAVAILABLE` | the platform could not dispatch the task (the only failure whose quota is refunded) | **Yes**, later |
