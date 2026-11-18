@@ -196,6 +196,9 @@ and …" as easily as anything else. Rules:
    settings, no outbound requests, no calling other capabilities (`asset:write`, `jobs.*` …). The
    summary is for a human to read.
 4. In your own UI, render it as **text**, never as HTML.
+5. **The model's summary can carry the page's injected links or instructions too.** Before sending it
+   to people with `notify.send`, strip links from it (as below) — or send only a fixed-format summary
+   you build yourself (error counts plus your own wording).
 
 ```ts
 async function report(ctx: Context, ins: PtPageInspection) {   // types from '@ptengine/app-backend'
@@ -226,7 +229,10 @@ async function report(ctx: Context, ins: PtPageInspection) {   // types from '@p
       },
     ],
   });
-  const summary = String(ai.choices[0]?.message?.content ?? '').slice(0, 3000);
+  // the summary may carry links / instructions injected by the page: strip links before pushing it to people
+  const summary = String(ai.choices[0]?.message?.content ?? '')
+    .replace(/\b(?:https?:\/\/|www\.)\S+/gi, '[link removed]')
+    .slice(0, 3000);
   // a human reads it — nothing in this code acts on the summary
   return ctx.pt.notify.send({ title: 'Page load check', text: summary });
 }
@@ -243,8 +249,9 @@ Needs `ai:invoke` and `notify:send` as well as `page:inspect` (and `jobs:run` fo
 | Same app + same normalized parameters | reuses the cached result for **10 minutes** (`cached: true`, no quota); while one is in flight you get that task back |
 | In flight per app (backend gateway) | 2 submissions, 4 lookups — `ctx.pt.page` retries the gateway's 429 `TOO_MANY_CONCURRENT_QUERIES` a few times before throwing it |
 
-**Failed inspections are not refunded** — the only exception is a task the platform could not hand
-to the inspector (`status: 'failed'` with `INSPECT_UNAVAILABLE`, see below). Over the limit →
+**Failed inspections are not refunded** — the only exception is when the platform could not dispatch
+the task at all (the call succeeds but the view has `status: 'failed'` and
+`error.code === 'INSPECT_UNAVAILABLE'`, see below); in that case the quota has already been refunded. Over the limit →
 `INSPECT_QUOTA_EXCEEDED`. Inspect what you will report, not every page "just in case".
 
 ## Call errors (`err.code` — the call itself was rejected)
@@ -261,9 +268,9 @@ to the inspector (`status: 'failed'` with `INSPECT_UNAVAILABLE`, see below). Ove
 | `PT_METHOD_NOT_ALLOWED` | — | bridge only: the host is older than the SDK | No — treat as unavailable |
 | `PT_PAGE_INSPECT_FAILED` | — | backend only: the gateway answered with no usable error | Later |
 
-**Also:** when the platform fails to hand the task to the inspector, the call itself **succeeds** and
-returns a view with `status: 'failed'` and `error.code === 'INSPECT_UNAVAILABLE'` — the quota is
-refunded; retry later. You may also see `PROFILE_FORBIDDEN`, `CONSENT_UNAVAILABLE`,
+**Also:** when the platform could not dispatch the task, the call itself **succeeds** and returns a
+view with `status: 'failed'` and `error.code === 'INSPECT_UNAVAILABLE'` — the one case where the quota
+has already been refunded; retry later. You may also see `PROFILE_FORBIDDEN`, `CONSENT_UNAVAILABLE`,
 `TOO_MANY_CONCURRENT_QUERIES`, `UNAUTHORIZED`, `SID_REQUIRED`, `INTERNAL_ERROR`, 501
 `PT_GATEWAY_NOT_BOUND` (backend without a gateway binding) and the bridge's other `PT_*` — keep a
 generic branch.
@@ -273,10 +280,10 @@ generic branch.
 | `ins.error.code` | Meaning | Retry? |
 | --- | --- | --- |
 | `INSPECT_BROWSER_UNAVAILABLE` | no inspection browser available right now | **Yes**, a bit later |
-| `INSPECT_TIMEOUT` | over the hard time limit, or stuck in the queue | **Yes**, a bit later |
+| `INSPECT_TIMEOUT` | over the hard time limit, or stuck in the queue | **Yes**, a bit later — when it was caused by queueing / the platform being busy. A page that logs an extremely large amount can also time out; retrying the same page won't help then — narrow it down with `filter` |
 | `INSPECT_PAGE_UNREACHABLE` | DNS / connection failure — no response for the main document | No — report it as "the page could not be reached" |
 | `INSPECT_FAILED` | anything else | No |
-| `INSPECT_UNAVAILABLE` | the platform could not dispatch the task (quota refunded) | **Yes**, later |
+| `INSPECT_UNAVAILABLE` | the platform could not dispatch the task (the only failure whose quota is refunded) | **Yes**, later |
 
 A retry of a failed task is a new inspection and counts against the quota again (except after
 `INSPECT_UNAVAILABLE`) — retry only the retryable codes, once or twice, not in a loop. A main
