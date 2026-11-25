@@ -74,6 +74,9 @@ calls your backend instead, on the schedule a **user** picked.
   row pause the job.
 - Heatmap images in a job (`ctx.pt.heatmap.capture`; finish a slow capture in the next run; ≤ 12 new images per run):
   [`heatmap.md`](heatmap.md#in-a-scheduled-job-finish-in-the-next-run-if-needed).
+- Page-load inspections in a job (`ctx.pt.page.inspect`, `page:inspect`; poll 10 s then every 3 s, ~90 s at most; ≤ 10 new
+  inspections per run; results deleted after 24 h; summarize with `ctx.pt.ai.chat` only as quoted, untrusted data):
+  [`page-inspect.md`](page-inspect.md#in-a-scheduled-job-finish-in-the-next-run-if-needed).
 
 ## 3. Preview
 
@@ -84,6 +87,8 @@ The drawer's "Generate preview" runs the route **for real** with `ctx.auth.previ
 - Writes are refused (`PREVIEW_READONLY` for `ctx.pt.jobs.*` mutations and asset writes); skip your own external
   side effects and your idempotency claim when `ctx.auth.preview` is true.
 - `ctx.log(...)` lines show up in the preview panel.
+- `ctx.pt.render.chart` and **`ctx.pt.page.inspect` run for real in a preview and count against their quotas**
+  (`page.inspect`: 200 per workspace per UTC day, 10 per run; a same-parameter call within 10 minutes hits the cache).
 
 ## 4. Sending from a user request ("instant")
 

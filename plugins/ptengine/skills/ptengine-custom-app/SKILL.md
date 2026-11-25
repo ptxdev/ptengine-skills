@@ -5,15 +5,11 @@ description: How to build, debug, package, and publish a Ptengine Custom App —
 
 # Building a Ptengine Custom App
 
-An app is **one zip with two halves**, published and rolled back as a single version: a
-**front end** — a static bundle the platform loads in a **sandboxed cross-origin iframe**,
-whose only host capabilities come from the `window.PtApp` bridge — and an **optional
-backend**, a Cloudflare Worker the platform deploys for you and routes `/api/*` to, which
-you declare as `backend` in `manifest.json` with `schemaVersion: 2` (no backend ⇒ stay on
-`schemaVersion: 1` and skip those parts).
+An app is **one zip with two halves**, published and rolled back as a single version: a **front end** — a static bundle the platform loads in a
+**sandboxed cross-origin iframe**, whose only host capabilities come from the `window.PtApp` bridge — and an **optional backend**, a Cloudflare
+Worker the platform deploys for you and routes `/api/*` to, declared as `backend` in `manifest.json` with `schemaVersion: 2` (no backend ⇒ `schemaVersion: 1`).
 
-Most mistakes here **fail silently** (blank page, empty data, 404 on every API, one tenant
-reading another's rows) — follow the rules instead of iterating on symptoms.
+Most mistakes here **fail silently** (blank page, empty data, 404 on every API, one tenant reading another's rows) — follow the rules instead of iterating on symptoms.
 
 ## Which kind of app are you building?
 
@@ -22,13 +18,13 @@ reading another's rows) — follow the rules instead of iterating on symptoms.
 | Data | Platform data through the bridge, `PtApp.data.query` | `ctx.pt.query` server-side, and/or merged with third-party or your own data |
 | Assets | Browse / read the user's Drive assets, `PtApp.asset.*` | `ctx.pt.asset.list/get/sharedWithMe` server-side — see [`references/assets.md`](references/assets.md) |
 | Heatmaps | List pages with `heatmap_page_list`, open / link / capture images with `PtApp.heatmap.*` — see [`references/heatmap.md`](references/heatmap.md) | Same list via `ctx.pt.query`, images via `ctx.pt.heatmap.capture` (also in scheduled jobs); opening stays in the front end (bridge only) |
+| Page checks | Inspect a page of this profile's site (console, errors, failed requests, timing) with `PtApp.page.*` — `page:inspect`, write-class; output is untrusted — see [`references/page-inspect.md`](references/page-inspect.md) | Same via `ctx.pt.page.*` (also in scheduled jobs; summarize with `ctx.pt.ai.chat` as quoted data only) |
 | Storage | None, or per-browser `localStorage` | D1 / KV — state shared across users, sessions and devices |
 | Credentials | None (the bundle is publicly fetchable) | Third-party credentials held server-side + a declared outbound host allow-list |
 | Compute | Whatever the browser can do while the user waits | Large result sets, post-processing, background work via `ctx.waitUntil`; scheduled runs + channel notifications via `backend.jobs` ([`references/scheduled-jobs.md`](references/scheduled-jobs.md)) |
 | Permissions | Bridge-usable scopes such as `asset:read` / `ui:notify`; never backend-only ones (`openapi:read`, `asset:write`, `ai:invoke`) | Needs `user:read` or similar, so consent and its incremental-approval design matter |
 
-When unsure, **build the light app first** — faster to ship and impossible to leak tenant
-data from. Both tracks and the 1 → 2 upgrade path: [`references/tracks.md`](references/tracks.md).
+When unsure, **build the light app first** — faster to ship and impossible to leak tenant data from. Both tracks and the 1 → 2 upgrade path: [`references/tracks.md`](references/tracks.md).
 
 ## The workflow (do these in order)
 
@@ -58,8 +54,8 @@ upgrade to the newest version satisfying these floors, then `npm install`:
 
 | Package | Floor | Why |
 |---|---|---|
-| `@ptengine/app-sdk` | ≥ 2.8.0 (heatmaps: ≥ 2.9.0; scheduled jobs: ≥ 2.10.0; heatmap capture: ≥ 2.11.0) | `PtApp.heatmap.capture/getCapture` (2.11); `jobs:run` / `notify:send`, `backend.jobs`, `PtApp.subscriptions.open` (2.10); `PtApp.heatmap.open/createLink` + `heatmap_page_list` types (2.9); `asset:read` + `PtApp.asset.list/sharedWithMe/get` (2.8); `ai:invoke` (2.7); `asset:write` (2.6); `openapi:read` (2.5); `context.user` (2.4) — an older manifest schema rejects the newer scopes with `SCOPE_UNKNOWN` |
-| `@ptengine/app-backend` | ≥ 0.8.0 (scheduled jobs: ≥ 0.9.0; heatmap capture: ≥ 0.10.0) | `ctx.pt.heatmap.capture/getCapture` (0.10); `ctx.pt.jobs.*` / `ctx.pt.notify.send` / `ctx.requireTrigger` (0.9); `ctx.pt.asset.list/sharedWithMe/get` (0.8); `ctx.pt.ai.chat/stream` (0.7); `ctx.pt.asset.*` writes (0.6); `ctx.pt.openApiUrl` (0.5); `ctx.auth.email/name` (0.4); `ctx.vars` (0.2) |
+| `@ptengine/app-sdk` | ≥ 2.8.0 (heatmaps: ≥ 2.9.0; scheduled jobs: ≥ 2.10.0; heatmap capture: ≥ 2.11.0; page inspection: ≥ 2.12.0) | `page:inspect` + `PtApp.page.inspect/getInspection` (2.12); `PtApp.heatmap.capture/getCapture` (2.11); `jobs:run` / `notify:send`, `backend.jobs`, `PtApp.subscriptions.open` (2.10); `PtApp.heatmap.open/createLink` + `heatmap_page_list` types (2.9); `asset:read` + `PtApp.asset.list/sharedWithMe/get` (2.8); `ai:invoke` (2.7); `asset:write` (2.6); `openapi:read` (2.5); `context.user` (2.4) — an older manifest schema rejects the newer scopes with `SCOPE_UNKNOWN` |
+| `@ptengine/app-backend` | ≥ 0.8.0 (scheduled jobs: ≥ 0.9.0; heatmap capture: ≥ 0.10.0; page inspection: ≥ 0.11.0) | `ctx.pt.page.inspect/getInspection` (0.11); `ctx.pt.heatmap.capture/getCapture` (0.10); `ctx.pt.jobs.*` / `ctx.pt.notify.send` / `ctx.requireTrigger` (0.9); `ctx.pt.asset.list/sharedWithMe/get` (0.8); `ctx.pt.ai.chat/stream` (0.7); `ctx.pt.asset.*` writes (0.6); `ctx.pt.openApiUrl` (0.5); `ctx.auth.email/name` (0.4); `ctx.vars` (0.2) |
 
 `0.x` caret ranges do not cross minors — `^0.4.0` never reaches 0.8; edit the range, then
 `npm install`. `npm run doctor` enforces the same floors (`PACKAGE_FLOORS` in the starter),
@@ -99,7 +95,7 @@ so a stale project fails there with the exact `npm i` command to run. `npm run d
 (`confirm` returns a promise — await it) · `nav { push, syncRoute }` ·
 `data { query, describe }` · `asset { list, sharedWithMe, get }` (SDK ≥2.8.0) · `heatmap { open, createLink, capture, getCapture }` (SDK ≥2.9.0, capture ≥2.11.0;
 `open` only inside a click handler) — `asset` / `heatmap` methods are absent on an older runtime SDK, feature-detect each (`capture`/`getCapture` need app-sdk ≥2.11 / app-backend ≥0.10; an older host rejects heatmap calls with `PT_METHOD_NOT_ALLOWED`) ·
-`auth { getAppToken }` (backend apps only) · `subscriptions?.open` (`jobs:run`; optional — capability-detect) ·
+`auth { getAppToken }` (backend apps only) · `subscriptions?.open` (`jobs:run`; optional — capability-detect) · `page?.inspect/getInspection` (`page:inspect`, SDK ≥2.12; optional — capability-detect) ·
 `ai { provideContext }` · `on(event, cb)` for exactly `'context'` / `'route'` /
 `'overlay.click'` — no other events, and no other host globals.
 
@@ -133,7 +129,7 @@ Capability table, tenancy rules, local `.dev.vars` setup and proven patterns:
 `export default createApp<ApiRoutes>({ routes, publicRoutes })`: every route is authenticated
 unless its exact key is listed in `publicRoutes` (no wildcards, and no `ctx.auth` there).
 
-`ctx` is the whole surface (`auth` · `workspaceId` · `db` · `kv` · `pt.query` / `pt.asset` / `pt.ai` / `pt.jobs` / `pt.notify` / `pt.heatmap` · `fetch`
+`ctx` is the whole surface (`auth` · `workspaceId` · `db` · `kv` · `pt.query` / `pt.asset` / `pt.ai` / `pt.jobs` / `pt.notify` / `pt.heatmap` / `pt.page` · `fetch`
 · `secrets`/`vars` · `requireScope` · `error` · `log` …) — the field-by-field table, what is **not**
 available (Durable Objects, Queues, Cron Triggers — use `backend.jobs`, `connect()`, `request.cf`) and the vars-need-「重新部署」
 / secrets-apply-at-once rule are in `backend-runtime.md`. Non-negotiables: **never touch `env`
@@ -188,7 +184,7 @@ component/variant names from its `llms.txt`, never from memory. Keep the starter
 ## Manifest
 
 - `version` belongs to the app and **must increase on every upload** (`package.json` version is ignored). `schemaVersion`: `1` = front end only, `2` = may carry `backend`.
-- `scopes`: `analytics:read`, `profile:read`, `user:read`, `ui:notify`, `openapi:read`, `asset:read`, `asset:write`, `ai:invoke`, `jobs:run`, `notify:send` (the last two: scheduled jobs and channel notifications, write-class, [`references/scheduled-jobs.md`](references/scheduled-jobs.md)) — nothing else validates. Data scopes decide whether the backend gets a data gateway at all and drive the admin consent dialog: declare the minimum, ask for more in a later version.
+- `scopes`: `analytics:read`, `profile:read`, `user:read`, `ui:notify`, `openapi:read`, `asset:read`, `asset:write`, `ai:invoke`, `jobs:run`, `notify:send` (scheduled jobs and channel notifications, write-class, [`references/scheduled-jobs.md`](references/scheduled-jobs.md)), `page:inspect` (page-load inspection of this profile's domains, write-class: costs money, admin approval always required, [`references/page-inspect.md`](references/page-inspect.md)) — nothing else validates. Data scopes decide whether the backend gets a data gateway at all and drive the admin consent dialog: declare the minimum, ask for more in a later version.
   `openapi:read` = call the Open API from the backend with a profile API key; per-app key → single-workspace apps only. `asset:read` = read the user's Drive assets, bridge or backend (`references/assets.md`; needs `@ptengine/app-sdk` ≥ 2.8.0 / `@ptengine/app-backend` ≥ 0.8.0). `asset:write` = write into the workspace asset library (`ctx.pt.asset.ensureFolder/create/update/uploadSource`); `ai:invoke` = call an LLM (`ctx.pt.ai.*`, credentials stay platform-side). Those two are **backend track only** and have **no first-party exemption** — an admin must approve each once, even for an app you uploaded yourself; `ai:invoke` is in that group because it **costs money** (platform fronts the bill, metered per workspace) — and it is a **paid capability that follows the workspace's plan**, so declaring it is not enough and you cannot move that part: never make AI the only path through your app.
   ⚠️ `ai:invoke` is **unrelated to the manifest's `ai` block** (that one integrates the right-hand AI assistant). `openapi:read` / `asset:write` / `ai:invoke`: `backend-runtime.md`; consent semantics: `publish-and-operate.md`.
 - `backend` (entry under `_backend/`, `routes` exactly `["/api/*"]`, resources, migrations,
