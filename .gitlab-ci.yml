@@ -26,6 +26,15 @@ validate:
     # CI 里不装 git hooks
     HUSKY: "0"
   script:
+    # 两种 runner 都要能跑（同 app-sdk / app-starter / custom-app-platform）：docker runner 用上面的 image: node:20，
+    # 机器上没有 nvm，这段直接跳过；组里的 shell runner（如 cn-runner-rancher2）忽略 image、自带 Node 16，
+    # 不认 `node --test`，靠 nvm 切到 22。这段只是 runner 环境兜底，不改校验规则（与 GitHub validate.yml 仍等价）。
+    - |
+      if [ -s "$HOME/.nvm/nvm.sh" ]; then
+        . "$HOME/.nvm/nvm.sh"
+        nvm install 22 >/dev/null
+        nvm use 22 >/dev/null
+      fi
     - node --version && npm --version
     # 用 npm ci 而非 install：package.json 与 lockfile 不一致时必须让 CI 红
     - npm ci --cache .npm --prefer-offline --no-audit --no-fund
