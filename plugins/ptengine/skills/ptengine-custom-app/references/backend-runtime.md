@@ -372,7 +372,7 @@ those customers cannot install at all.
 ```ts
 // Complete result — the user waits for the whole generation.
 const res = await ctx.pt.ai.chat({
-    model: 'anthropic/claude-sonnet-5',          // provider prefix is REQUIRED
+    model: 'claude-sonnet-5',                    // logical name, NO vendor prefix
     messages: [{ role: 'user', content: 'Summarise last week in one paragraph.' }],
     max_tokens: 1024
 });
@@ -380,16 +380,19 @@ return { text: res.choices[0].message.content };
 
 // Streaming — return the Response straight from your route.
 app.post('/ask', async ctx => ctx.pt.ai.stream({
-    model: 'anthropic/claude-sonnet-5',
+    model: 'claude-sonnet-5',
     messages: [{ role: 'user', content: ctx.body.question }]
 }));
 ```
 
-1. **`model` must carry the provider prefix** (`anthropic/claude-sonnet-5`), and must be on the
-   allow-list. A bare name, a wildcard, or anything not on the list is rejected with
-   400 `AI_MODEL_NOT_ALLOWED` **and the error names every allowed model** — so you never have to
-   guess twice. The runtime does not add a prefix for you: guessing the provider is worse than
-   failing.
+1. **`model` is a logical name with no vendor prefix** (`claude-sonnet-5`), and must be on the
+   allow-list. Which provider and whose credentials serve it is decided by the platform gateway,
+   per environment — your app does not need to know, and the route can change without you
+   touching code. A misspelling, a wildcard, or anything not on the list is rejected with
+   400 `AI_MODEL_NOT_ALLOWED`; a known model that is not enabled in the current environment gets
+   400 `AI_MODEL_UNAVAILABLE`. **Both errors name every model available in that environment** —
+   so you never have to guess twice. Older prefixed names (`anthropic/claude-sonnet-5`) are still
+   accepted, but the prefix no longer chooses the route; write the logical name.
 2. **Do not `await res.text()` on the streaming `Response` and forward that.** It buffers the whole
    SSE stream and turns streaming into a single late response. Short answers look fine, so this
    only shows up on the long ones — exactly the ones streaming was for. Use
@@ -398,15 +401,19 @@ app.post('/ask', async ctx => ctx.pt.ai.stream({
    would `json()` an SSE stream and throw an unexplainable parse error.
 4. Everything except `stream` is passed through untouched (`temperature`, `tools`, …). There is no
    allow-list, so new upstream parameters work the day they ship.
+5. **The `model` field in the response is whatever the upstream returned** — it is not guaranteed
+   to equal the logical name you sent. Do not branch on it.
 
 ### Which models can I use?
 
 **Read `scripts/rules.json` in the project — the `aiModels` field.** That file is generated from
 the platform contract and kept in sync by CI, so it is the list that is actually enforced, not a
 copy in prose that drifts. `ptx doctor` also prints it for any app declaring `ai:invoke`, and
-warns if your backend references a model that is not on it.
+warns if your backend references a model that is not on it or uses an old prefixed name. It is
+the only list you need: which provider serves a model, and in which environment, is the
+platform's business.
 
-It spans Anthropic, OpenAI and Google. **Do not assume a model exists because Cloudflare's model
+It spans Anthropic, OpenAI and Google, plus a few image models (see [Generating images](#generating-images)). **Do not assume a model exists because Cloudflare's model
 catalogue lists it** — that page shows what AI Gateway knows about, not what this gateway is
 configured and verified to serve, and the exact id spelling is easy to get subtly wrong
 (`claude-haiku-4-5-20251001` vs the catalogue's `claude-haiku-4.5`). Read `rules.json`, not the
@@ -418,6 +425,33 @@ budget, and when it runs out the whole environment gets 429. A summarisation or 
 step almost never needs the flagship — reach for the fast tier first and move up only when you
 can tell the difference.
 
+### Generating images
+
+Image models are on the same list and go through the **same `ctx.pt.ai.chat()`** — there is no
+separate image API. Today: `gpt-image-2.6-sunburst`, `gpt-image-2.6-flare`, `seedream-5-5`,
+`gemini-nano-banana-2.1` (check `aiModels` for the current set).
+
+```ts
+const res = await ctx.pt.ai.chat({
+    model: 'seedream-5-5',
+    modalities: ['image'],              // required; gemini-nano-banana-2.1 also takes ['image', 'text']
+    messages: [{ role: 'user', content: 'A flat illustration of a shopping cart, white background' }]
+});
+// Not in the SDK's message type yet — read it through a cast.
+const msg = res.choices[0].message as { content: string; images?: { image_url: { url: string } }[] };
+const dataUrl = msg.images?.[0]?.image_url.url;   // "data:image/png;base64,…"
+```
+
+1. **Use `chat()`, not `stream()`.** The image arrives in one piece at the end; generation can take
+   tens of seconds, so show a progress state in the UI.
+2. **The result is a base64 data URL, often megabytes.** Hand it to the front end or into an asset;
+   do not drop it into KV or D1 as-is, and do not keep several in memory at once.
+3. **Image calls are priced per picture and cost far more than a text answer** (the two
+   `gpt-image-*` are the dearest). Generate on an explicit user action, never in a loop over rows
+   or on every page load, and cache what you already produced.
+4. Model-specific knobs (size, aspect ratio, quality) are passed through untouched, but each model
+   names them differently — if a parameter seems ignored, that model does not support it.
+
 ### The two 429s are not the same
 
 | Code | HTTP | What to do |
@@ -428,6 +462,7 @@ can tell the difference.
 | `AI_BUDGET_EXCEEDED` | 429 | **The workspace's AI budget is spent.** Raise the limit or wait for the window — **retrying will not help** |
 | `AI_RATE_LIMITED` | 429 | Upstream throttling. This one *is* worth retrying |
 | `AI_MODEL_NOT_ALLOWED` | 400 | The model is not on the allow-list. **The error lists the allowed ones** |
+| `AI_MODEL_UNAVAILABLE` | 400 | The model exists but is not enabled in this environment. Pick one from `aiModels` — every model there works in every environment |
 | `AI_UPSTREAM_FAILED` | 502 | Upstream's own failure; the message is passed through verbatim |
 
 **Never collapse those two 429s into one "please try again later".** One of them needs a human to
