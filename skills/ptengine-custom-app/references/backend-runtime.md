@@ -413,7 +413,7 @@ warns if your backend references a model that is not on it or uses an old prefix
 the only list you need: which provider serves a model, and in which environment, is the
 platform's business.
 
-It spans Anthropic, OpenAI and Google. **Do not assume a model exists because Cloudflare's model
+It spans Anthropic, OpenAI and Google, plus a few image models (see [Generating images](#generating-images)). **Do not assume a model exists because Cloudflare's model
 catalogue lists it** — that page shows what AI Gateway knows about, not what this gateway is
 configured and verified to serve, and the exact id spelling is easy to get subtly wrong
 (`claude-haiku-4-5-20251001` vs the catalogue's `claude-haiku-4.5`). Read `rules.json`, not the
@@ -424,6 +424,33 @@ not per workspace: an app running everything through a top-tier model is spendin
 budget, and when it runs out the whole environment gets 429. A summarisation or classification
 step almost never needs the flagship — reach for the fast tier first and move up only when you
 can tell the difference.
+
+### Generating images
+
+Image models are on the same list and go through the **same `ctx.pt.ai.chat()`** — there is no
+separate image API. Today: `gpt-image-2.6-sunburst`, `gpt-image-2.6-flare`, `seedream-5-5`,
+`gemini-nano-banana-2.1` (check `aiModels` for the current set).
+
+```ts
+const res = await ctx.pt.ai.chat({
+    model: 'seedream-5-5',
+    modalities: ['image'],              // required; gemini-nano-banana-2.1 also takes ['image', 'text']
+    messages: [{ role: 'user', content: 'A flat illustration of a shopping cart, white background' }]
+});
+// Not in the SDK's message type yet — read it through a cast.
+const msg = res.choices[0].message as { content: string; images?: { image_url: { url: string } }[] };
+const dataUrl = msg.images?.[0]?.image_url.url;   // "data:image/png;base64,…"
+```
+
+1. **Use `chat()`, not `stream()`.** The image arrives in one piece at the end; generation can take
+   tens of seconds, so show a progress state in the UI.
+2. **The result is a base64 data URL, often megabytes.** Hand it to the front end or into an asset;
+   do not drop it into KV or D1 as-is, and do not keep several in memory at once.
+3. **Image calls are priced per picture and cost far more than a text answer** (the two
+   `gpt-image-*` are the dearest). Generate on an explicit user action, never in a loop over rows
+   or on every page load, and cache what you already produced.
+4. Model-specific knobs (size, aspect ratio, quality) are passed through untouched, but each model
+   names them differently — if a parameter seems ignored, that model does not support it.
 
 ### The two 429s are not the same
 
