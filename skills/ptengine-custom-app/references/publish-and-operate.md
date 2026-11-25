@@ -95,7 +95,7 @@ Two consequences worth designing for:
 - Design the backend so a rollback to the previous, narrower version still
   works: put `ctx.requireScope()` only on routes that genuinely read platform
   data, so the rest of the app degrades instead of failing wholesale.
-- **Write scopes (`asset:write`, `ai:invoke`) do not behave like read scopes here.** Read
+- **Write scopes (`asset:write`, `ai:invoke`, `page:inspect` …) do not behave like read scopes here.** Read
   scopes are implicitly granted for apps the workspace built itself, so in
   practice their dialog never appears and "revoke" has nothing to take away. A
   write scope has **no such exemption**: it only ever comes from a stored,
@@ -112,6 +112,8 @@ Two consequences worth designing for:
   an exemption would mean anyone who can upload an app into their own workspace
   can start spending. The consent dialog's wording says so in all three
   languages; keep your own UI honest about it too.
+- `page:inspect` is in the write group for both reasons: every inspection costs money, and it
+  visits the customer's website **as the platform**. Same rule — one explicit, revocable approval.
 - **`ai:invoke` is also gated by the workspace's plan, and that gate is not the
   consent dialog.** Two different causes, **one indistinguishable error**: an
   admin not having clicked approve, and the workspace not being entitled at all,
@@ -208,6 +210,12 @@ response. It needs a **deploy credential scoped to that app** (generated on the
 management page, shown once, revocable) plus the app id, both supplied through
 CI variables. Never commit that credential or put an account-level one in CI —
 any dependency in the job can read it, and `ptx doctor` flags a committed one.
+
+Run **`npm run audit`** in the same job, before `ptx deploy`, and fail the job on exit code
+**2** (a severe finding; strict teams fail on 1 too). The platform's publish gate only applies
+to apps built inside App Builder — a zip uploaded from CI or by hand is not checked — so this
+is where a locally built app gets its gate. `npm run -s audit -- --json` gives a machine-readable
+report if you want to attach it to the pipeline.
 
 ## Status lifecycle and rollback
 

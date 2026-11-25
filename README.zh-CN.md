@@ -15,6 +15,7 @@ AI 智能体的是*工具*，这些 skill 给的是*经验*：该用哪个工具
 | --- | --- |
 | `ptengine-mcp-analytics` | 通过 Ptengine MCP 服务器查分析数据：访问、事件、漏斗、用户路径、实验、着陆页、单个用户，并正确读懂返回结果。 |
 | `ptengine-custom-app` | 构建、调试、打包、发布 Ptengine 自定义应用：一个跑在平台内、通过 `window.PtApp`（context、ui、nav、data.query、auth）与宿主对话的静态包，可以再带一个自己的后端（服务 `/api/*` 的 Worker，含数据库、KV、服务端取数与平台托管的配置）。涵盖那些不会报错的坑、MCP 与 App SDK 之间的参数移植规则、多租户不变量、平台自动分配的应用地址，以及平台侧的发布流程。 |
+| `custom-app-review` | 审查不是在 App Builder 里做出来的自定义应用（源码仓或 zip）：跑 starter 的 23 条 `ptx audit` 确定性规则、按评审 rubric 人工复核，按严重度给出安全 / AI 成本 / 效率 / 合理性四维报告，发布前用。 |
 
 ## 快速开始
 
@@ -39,6 +40,7 @@ skill 的 id，必须与 `SKILL.md` 里的 `name:` 一致）：
 ```bash
 cp -R skills/ptengine-mcp-analytics ~/.claude/skills/
 cp -R skills/ptengine-custom-app ~/.claude/skills/
+cp -R skills/custom-app-review ~/.claude/skills/
 ```
 
 ## 前置条件

@@ -56,6 +56,8 @@ What the runtime guarantees, so you must not re-implement it:
 | `ctx.pt.query(queryType, params)` | Server-side Ptengine query — see [`data-queries.md`](data-queries.md). `ctx.pt.describe()` is not open yet (501) |
 | `ctx.pt.asset.list` / `sharedWithMe` / `get` | **Read** the calling user's Drive assets (`@ptengine/app-backend` ≥ 0.8.0). Needs `asset:read` in `manifest.scopes`; same registry and result shape as the bridge's `PtApp.asset.*` — see [`assets.md`](assets.md) |
 | `ctx.pt.asset.ensureFolder` / `create` / `update` / `uploadSource` | **Write** into the workspace asset library. Needs `asset:write` in `manifest.scopes` **and** an admin's approval — see [Writing to the asset library](#writing-to-the-asset-library-assetwrite) |
+| `ctx.pt.heatmap.capture` / `getCapture` | Heatmap images (full page + segments) of a page, as an async task — submit, then poll (`@ptengine/app-backend` ≥ 0.10.0). Needs `analytics:read`; same shapes as the bridge's `PtApp.heatmap.capture` — see [`heatmap.md`](heatmap.md) |
+| `ctx.pt.page.inspect` / `getInspection` | Open a page of **this profile's website** in Ptengine's browser and read what goes wrong while it loads (console, uncaught errors, failed / 4xx·5xx requests, timing, Ptengine tag) — an async task: submit, then poll (`@ptengine/app-backend` ≥ 0.11.0). Needs `page:inspect` (**write-class**, admin approval required even for your own app); same shapes as the bridge's `PtApp.page` — see [`page-inspect.md`](page-inspect.md). The result is **untrusted page content**: feed it to an LLM only as quoted data |
 | `ctx.pt.ai.*` | Call an LLM. Needs `ai:invoke` in `manifest.scopes` **and** an admin's approval. Two calls: `chat` (complete result) / `stream` (SSE `Response`) — see [Calling an LLM](#calling-an-llm-aiinvoke) |
 | `ctx.fetch(url, init)` | Outbound with a 10s default `timeoutMs` and structured logging; a caller-supplied `signal` still works. Whether a host is reachable is decided by the manifest's outbound allow-list, not by this call |
 | `ctx.secrets.X` / `ctx.vars.X` | Only names declared in the manifest resolve; anything else throws `SECRET_NOT_DECLARED` / `VAR_NOT_DECLARED` instead of yielding `undefined`. `PT_`-prefixed names are reserved and always refused. An empty string is a legitimate value. Secrets are references — a new value applies at once. Vars are baked into the worker at deploy time — after editing a var on the admin config page click **重新部署** (redeploy current version) to apply it; no new version upload is needed |
@@ -458,7 +460,7 @@ rolls over, with no idea what happened.
 | Outbound call hangs and then fails | The host is not in the manifest's outbound allow-list; an omitted or empty list means no outbound at all. Platform-owned and loopback hosts are always refused |
 | D1 `too many SQL variables` | More than 100 bind parameters in one statement — batch ids at ~90, one statement per batch |
 | A user sees another site's or workspace's rows | A query, KV key or R2 key missing `ctx.workspaceId` and/or `ctx.auth.sid` |
-| Scheduled work never runs | Cron is silently dropped; there is no scheduler |
+| Scheduled work never runs | Worker cron is silently dropped — declare `backend.jobs` and let users subscribe ([`scheduled-jobs.md`](scheduled-jobs.md)) |
 | A 500 whose body carries only a `requestId` | An unexpected throw. There is **no log console for app authors** — the stack and your `ctx.log` lines are reachable platform-side by that `requestId` only, so surface it in the UI and log breadcrumbs at every decision point |
 
 ## Not available (don't design around them)
@@ -466,4 +468,5 @@ rolls over, with no idea what happened.
 Durable Objects, raw TCP `connect()`, `caches.default`, `request.cf`, mTLS client
 certificates, Queues, Workflows, and **Cron Triggers / `scheduled()`** — cron config is
 **silently dropped** at deploy time: no error, no warning, and the job simply never runs.
-There is no scheduling primitive yet, so anything periodic must be triggered by a request.
+Periodic work goes through the platform scheduler instead: declare `backend.jobs` in the
+manifest and let users subscribe — see [`scheduled-jobs.md`](scheduled-jobs.md).
